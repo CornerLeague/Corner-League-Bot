@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from libs.common.config import get_settings
-from libs.common.database import ConnectionPool
+from libs.common.database import ConnectionPool, DatabaseManager
 from libs.ingestion.crawler import WebCrawler
 from libs.ingestion.extractor import ContentExtractor
 from libs.quality.scorer import QualityGate
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Global instances
 settings = get_settings()
 connection_pool: Optional[ConnectionPool] = None
+db_manager: Optional[DatabaseManager] = None
 search_engine: Optional[SearchEngine] = None
 trending_loop: Optional[TrendingDiscoveryLoop] = None
 quality_gate: Optional[QualityGate] = None
@@ -175,7 +176,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     
-    global connection_pool, search_engine, trending_loop, quality_gate
+    global connection_pool, db_manager, search_engine, trending_loop, quality_gate
     
     # Startup
     logger.info("Starting Corner League Bot API...")
@@ -186,13 +187,17 @@ async def lifespan(app: FastAPI):
         await connection_pool.initialize()
         logger.info("Database connection pool initialized")
         
+        # Initialize database manager
+        db_manager = DatabaseManager(settings.database.url)
+        logger.info("Database manager initialized")
+        
         # Initialize search engine
-        search_engine = SearchEngine(settings, connection_pool)
+        search_engine = SearchEngine(settings, connection_pool, db_manager=db_manager)
         await search_engine.initialize()
         logger.info("Search engine initialized")
         
         # Initialize trending detection
-        trending_loop = TrendingDiscoveryLoop(settings, connection_pool)
+        trending_loop = TrendingDiscoveryLoop(settings, connection_pool, db_manager=db_manager)
         logger.info("Trending detection initialized")
         
         # Initialize quality gate
@@ -276,6 +281,13 @@ async def get_quality_gate() -> QualityGate:
     return quality_gate
 
 
+async def get_db_manager() -> DatabaseManager:
+    """Get database manager"""
+    if not db_manager:
+        raise HTTPException(status_code=503, detail="Database manager not available")
+    return db_manager
+
+
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[str]:
     """Verify JWT token (placeholder implementation)"""
     if not credentials:
@@ -289,7 +301,7 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check(
-    pool: ConnectionPool = Depends(get_connection_pool)
+    db_manager: DatabaseManager = Depends(get_db_manager)
 ) -> HealthResponse:
     """Health check endpoint"""
     
@@ -297,7 +309,11 @@ async def health_check(
     
     # Check database
     try:
-        await pool.fetchval("SELECT 1")
+        async for session in db_manager.get_session():
+            from sqlalchemy import text
+            result = await session.execute(text("SELECT 1"))
+            result.scalar()
+            break  # Only need one iteration
         services["database"] = {"status": "healthy", "response_time_ms": 0}
     except Exception as e:
         services["database"] = {"status": "unhealthy", "error": str(e)}
@@ -348,10 +364,33 @@ async def search_content(
         # Execute search
         results = await engine.search(search_query)
         
-        # Convert to response model
-        items = [
-            ContentItem(**item) for item in results['items']
-        ]
+        # Convert to response model with proper data processing
+        items = []
+        for item in results['items']:
+            # Process JSON fields and handle None values
+            processed_item = dict(item)
+            
+            # Handle sports_keywords - convert from string to list if needed
+            if isinstance(processed_item.get('sports_keywords'), str):
+                import json
+                try:
+                    processed_item['sports_keywords'] = json.loads(processed_item['sports_keywords'])
+                except (json.JSONDecodeError, TypeError):
+                    # If it's a comma-separated string, split it
+                    processed_item['sports_keywords'] = [kw.strip() for kw in processed_item['sports_keywords'].split(',') if kw.strip()]
+            elif processed_item.get('sports_keywords') is None:
+                processed_item['sports_keywords'] = []
+            
+            # Handle language field
+            if processed_item.get('language') is None:
+                processed_item['language'] = 'en'
+            
+            # Ensure required fields have defaults
+            processed_item.setdefault('source_name', 'Unknown')
+            processed_item.setdefault('quality_score', 0.0)
+            
+            items.append(ContentItem(**processed_item))
+        
         
         return SearchResponse(
             items=items,
@@ -392,7 +431,29 @@ async def get_content(
         if not row:
             raise HTTPException(status_code=404, detail="Content not found")
         
-        return ContentItem(**dict(row))
+        # Process the row data similar to search endpoint
+        processed_item = dict(row)
+        
+        # Handle sports_keywords - convert from string to list if needed
+        if isinstance(processed_item.get('sports_keywords'), str):
+            import json
+            try:
+                processed_item['sports_keywords'] = json.loads(processed_item['sports_keywords'])
+            except (json.JSONDecodeError, TypeError):
+                # If it's a comma-separated string, split it
+                processed_item['sports_keywords'] = [kw.strip() for kw in processed_item['sports_keywords'].split(',') if kw.strip()]
+        elif processed_item.get('sports_keywords') is None:
+            processed_item['sports_keywords'] = []
+        
+        # Handle language field
+        if processed_item.get('language') is None:
+            processed_item['language'] = 'en'
+        
+        # Ensure required fields have defaults
+        processed_item.setdefault('source_name', 'Unknown')
+        processed_item.setdefault('quality_score', 0.0)
+        
+        return ContentItem(**processed_item)
     
     except HTTPException:
         raise
@@ -414,9 +475,20 @@ async def get_trending_terms(
         # Limit results
         trending_terms = trending_terms[:limit]
         
-        return [
-            TrendingTerm(**term.to_dict()) for term in trending_terms
-        ]
+        # Convert to Pydantic models
+        result = []
+        for term in trending_terms:
+            term_dict = term.to_dict()
+            # Convert ISO strings back to datetime objects for Pydantic
+            if term_dict['trend_start']:
+                term_dict['trend_start'] = datetime.fromisoformat(term_dict['trend_start'])
+            if term_dict['trend_peak']:
+                term_dict['trend_peak'] = datetime.fromisoformat(term_dict['trend_peak'])
+            term_dict['last_seen'] = datetime.fromisoformat(term_dict['last_seen'])
+            
+            result.append(TrendingTerm(**term_dict))
+        
+        return result
     
     except Exception as e:
         logger.error(f"Trending terms error: {e}")

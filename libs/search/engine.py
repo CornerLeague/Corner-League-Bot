@@ -68,9 +68,15 @@ class SearchQuery:
 class PostgreSQLSearchEngine:
     """PostgreSQL full-text search implementation"""
     
-    def __init__(self, settings: Settings, connection_pool: ConnectionPool):
+    def __init__(self, settings: Settings, connection_pool: ConnectionPool, db_manager=None):
         self.settings = settings
-        self.pool = connection_pool
+        # Use provided db_manager or create new one
+        if db_manager:
+            self.db_manager = db_manager
+        else:
+            # Import here to avoid circular imports
+            from libs.common.database import DatabaseManager
+            self.db_manager = DatabaseManager(settings.database.url)
     
     async def search(self, search_query: SearchQuery) -> Dict[str, Any]:
         """Execute search using PostgreSQL FTS"""
@@ -81,23 +87,28 @@ class PostgreSQLSearchEngine:
         sql_query, params = self._build_sql_query(search_query)
         
         try:
-            # Execute search
-            rows = await self.pool.fetch(sql_query, *params)
-            
-            # Process results
-            items = []
-            for row in rows:
-                item = dict(row)
+            # Use SQLAlchemy session for database operations
+            async for session in self.db_manager.get_session():
+                # Execute search using SQLAlchemy
+                from sqlalchemy import text
+                result = await session.execute(text(sql_query), params)
+                rows = result.fetchall()
                 
-                # Add search metadata
-                item['search_score'] = item.get('search_score', 0.0)
-                item['search_rank'] = len(items) + 1
+                # Process results
+                items = []
+                for row in rows:
+                    item = dict(row._mapping)
+                    
+                    # Add search metadata
+                    item['search_score'] = item.get('search_score', 0.0)
+                    item['search_rank'] = len(items) + 1
+                    
+                    items.append(item)
                 
-                items.append(item)
-            
-            # Get total count (for pagination)
-            count_query, count_params = self._build_count_query(search_query)
-            total_count = await self.pool.fetchval(count_query, *count_params)
+                # Get total count (for pagination)
+                count_query, count_params = self._build_count_query(search_query)
+                count_result = await session.execute(text(count_query), count_params)
+                total_count = count_result.scalar()
             
             # Generate next cursor
             next_cursor = None
@@ -120,10 +131,10 @@ class PostgreSQLSearchEngine:
             logger.error(f"PostgreSQL search error: {e}")
             raise
     
-    def _build_sql_query(self, search_query: SearchQuery) -> Tuple[str, List[Any]]:
-        """Build PostgreSQL FTS query"""
+    def _build_sql_query(self, search_query: SearchQuery) -> Tuple[str, Dict[str, Any]]:
+        """Build SQLite-compatible search query"""
         
-        params = []
+        params = {}
         where_conditions = []
         
         # Base query with joins
@@ -146,10 +157,15 @@ class PostgreSQLSearchEngine:
         
         # Add search scoring if query provided
         if search_query.query:
+            # Simple relevance scoring based on title and summary matches
             base_query += """
-            , ts_rank_cd(ci.search_vector, plainto_tsquery($1)) as search_score
+            , (CASE 
+                WHEN ci.title LIKE '%' || :query || '%' THEN 3.0
+                WHEN ci.summary LIKE '%' || :query || '%' THEN 2.0
+                ELSE 1.0
+              END) as search_score
             """
-            params.append(search_query.query)
+            params['query'] = search_query.query
         else:
             base_query += ", ci.quality_score as search_score"
         
@@ -160,49 +176,64 @@ class PostgreSQLSearchEngine:
         
         # Add search condition
         if search_query.query:
-            where_conditions.append("ci.search_vector @@ plainto_tsquery($1)")
+            where_conditions.append("(ci.title LIKE '%' || :query || '%' OR ci.summary LIKE '%' || :query || '%' OR ci.sports_keywords LIKE '%' || :query || '%')")
         
         # Add filters
-        where_conditions.append("ci.is_active = true")
-        where_conditions.append("ci.is_duplicate = false")
-        where_conditions.append("ci.is_spam = false")
+        where_conditions.append("ci.is_active = 1")
+        where_conditions.append("ci.is_duplicate = 0")
+        where_conditions.append("ci.is_spam = 0")
         
         # Sports filter
         if search_query.sports:
-            params.append(search_query.sports)
-            where_conditions.append("ci.sports_keywords && $" + str(len(params)))
+            sports_conditions = []
+            for i, sport in enumerate(search_query.sports):
+                param_name = f'sport_{i}'
+                params[param_name] = f'%{sport}%'
+                sports_conditions.append(f"ci.sports_keywords LIKE :{param_name}")
+            if sports_conditions:
+                where_conditions.append(f"({' OR '.join(sports_conditions)})")
         
         # Sources filter
         if search_query.sources:
-            params.append(search_query.sources)
-            where_conditions.append("s.domain = ANY($" + str(len(params)) + ")")
+            sources_conditions = []
+            for i, source in enumerate(search_query.sources):
+                param_name = f'source_{i}'
+                params[param_name] = source
+                sources_conditions.append(f"s.domain = :{param_name}")
+            if sources_conditions:
+                where_conditions.append(f"({' OR '.join(sources_conditions)})")
         
         # Content types filter
         if search_query.content_types:
-            params.append(search_query.content_types)
-            where_conditions.append("ci.content_type = ANY($" + str(len(params)) + ")")
+            types_conditions = []
+            for i, content_type in enumerate(search_query.content_types):
+                param_name = f'type_{i}'
+                params[param_name] = content_type
+                types_conditions.append(f"ci.content_type = :{param_name}")
+            if types_conditions:
+                where_conditions.append(f"({' OR '.join(types_conditions)})")
         
         # Quality threshold
         if search_query.quality_threshold is not None:
-            params.append(search_query.quality_threshold)
-            where_conditions.append("ci.quality_score >= $" + str(len(params)))
+            params['quality_threshold'] = search_query.quality_threshold
+            where_conditions.append("ci.quality_score >= :quality_threshold")
         
         # Date range filter
         if search_query.date_range:
             if 'start' in search_query.date_range:
-                params.append(search_query.date_range['start'])
-                where_conditions.append("ci.published_at >= $" + str(len(params)))
+                params['date_start'] = search_query.date_range['start']
+                where_conditions.append("ci.published_at >= :date_start")
             
             if 'end' in search_query.date_range:
-                params.append(search_query.date_range['end'])
-                where_conditions.append("ci.published_at <= $" + str(len(params)))
+                params['date_end'] = search_query.date_range['end']
+                where_conditions.append("ci.published_at <= :date_end")
         
-        # Cursor-based pagination
-        if search_query.cursor:
-            cursor_conditions = self._parse_cursor(search_query.cursor, search_query)
-            if cursor_conditions:
-                where_conditions.extend(cursor_conditions['conditions'])
-                params.extend(cursor_conditions['params'])
+        # Skip cursor-based pagination for now - will need separate handling
+        # if search_query.cursor:
+        #     cursor_conditions = self._parse_cursor(search_query.cursor, search_query)
+        #     if cursor_conditions:
+        #         where_conditions.extend(cursor_conditions['conditions'])
+        #         params.update(cursor_conditions['params'])
         
         # Build WHERE clause
         where_clause = ""
@@ -213,18 +244,18 @@ class PostgreSQLSearchEngine:
         order_clause = self._build_order_clause(search_query)
         
         # Build LIMIT clause
-        params.append(search_query.limit)
-        limit_clause = f"LIMIT ${len(params)}"
+        params['limit'] = search_query.limit
+        limit_clause = "LIMIT :limit"
         
         # Combine query
         full_query = f"{base_query} {where_clause} {order_clause} {limit_clause}"
         
         return full_query, params
     
-    def _build_count_query(self, search_query: SearchQuery) -> Tuple[str, List[Any]]:
+    def _build_count_query(self, search_query: SearchQuery) -> Tuple[str, Dict[str, Any]]:
         """Build count query for pagination"""
         
-        params = []
+        params = {}
         where_conditions = []
         
         base_query = """
@@ -235,38 +266,56 @@ class PostgreSQLSearchEngine:
         
         # Add search condition
         if search_query.query:
-            params.append(search_query.query)
-            where_conditions.append("ci.search_vector @@ plainto_tsquery($1)")
+            params['query'] = search_query.query
+            where_conditions.append("(ci.title LIKE '%' || :query || '%' OR ci.summary LIKE '%' || :query || '%' OR ci.sports_keywords LIKE '%' || :query || '%')")
         
         # Add same filters as main query (excluding cursor)
-        where_conditions.append("ci.is_active = true")
-        where_conditions.append("ci.is_duplicate = false")
-        where_conditions.append("ci.is_spam = false")
+        where_conditions.append("ci.is_active = 1")
+        where_conditions.append("ci.is_duplicate = 0")
+        where_conditions.append("ci.is_spam = 0")
         
+        # Sports filter
         if search_query.sports:
-            params.append(search_query.sports)
-            where_conditions.append("ci.sports_keywords && $" + str(len(params)))
+            sports_conditions = []
+            for i, sport in enumerate(search_query.sports):
+                param_name = f'sport_{i}'
+                params[param_name] = f'%{sport}%'
+                sports_conditions.append(f"ci.sports_keywords LIKE :{param_name}")
+            if sports_conditions:
+                where_conditions.append(f"({' OR '.join(sports_conditions)})")
         
+        # Sources filter
         if search_query.sources:
-            params.append(search_query.sources)
-            where_conditions.append("s.domain = ANY($" + str(len(params)) + ")")
+            sources_conditions = []
+            for i, source in enumerate(search_query.sources):
+                param_name = f'source_{i}'
+                params[param_name] = source
+                sources_conditions.append(f"s.domain = :{param_name}")
+            if sources_conditions:
+                where_conditions.append(f"({' OR '.join(sources_conditions)})")
         
+        # Content types filter
         if search_query.content_types:
-            params.append(search_query.content_types)
-            where_conditions.append("ci.content_type = ANY($" + str(len(params)) + ")")
+            types_conditions = []
+            for i, content_type in enumerate(search_query.content_types):
+                param_name = f'type_{i}'
+                params[param_name] = content_type
+                types_conditions.append(f"ci.content_type = :{param_name}")
+            if types_conditions:
+                where_conditions.append(f"({' OR '.join(types_conditions)})")
         
         if search_query.quality_threshold is not None:
-            params.append(search_query.quality_threshold)
-            where_conditions.append("ci.quality_score >= $" + str(len(params)))
+            params['quality_threshold'] = search_query.quality_threshold
+            where_conditions.append("ci.quality_score >= :quality_threshold")
         
         if search_query.date_range:
             if 'start' in search_query.date_range:
-                params.append(search_query.date_range['start'])
-                where_conditions.append("ci.published_at >= $" + str(len(params)))
+                params['date_start'] = search_query.date_range['start']
+                where_conditions.append("ci.published_at >= :date_start")
             
             if 'end' in search_query.date_range:
-                params.append(search_query.date_range['end'])
-                where_conditions.append("ci.published_at <= $" + str(len(params)))
+                params['date_end'] = search_query.date_range['end']
+                where_conditions.append("ci.published_at <= :date_end")
         
         where_clause = ""
         if where_conditions:
@@ -306,17 +355,25 @@ class PostgreSQLSearchEngine:
             'sort_by': search_query.sort_by,
         }
         
+        # Helper function to format published_at
+        def format_published_at(published_at):
+            if not published_at:
+                return None
+            if isinstance(published_at, str):
+                return published_at
+            return published_at.isoformat()
+        
         if search_query.sort_by == 'relevance':
             cursor_data['search_score'] = item.get('search_score', 0.0)
-            cursor_data['published_at'] = item['published_at'].isoformat() if item.get('published_at') else None
+            cursor_data['published_at'] = format_published_at(item.get('published_at'))
         
         elif search_query.sort_by == 'date':
-            cursor_data['published_at'] = item['published_at'].isoformat() if item.get('published_at') else None
+            cursor_data['published_at'] = format_published_at(item.get('published_at'))
             cursor_data['quality_score'] = item.get('quality_score', 0.0)
         
         elif search_query.sort_by == 'quality':
             cursor_data['quality_score'] = item.get('quality_score', 0.0)
-            cursor_data['published_at'] = item['published_at'].isoformat() if item.get('published_at') else None
+            cursor_data['published_at'] = format_published_at(item.get('published_at'))
         
         # Encode cursor
         cursor_json = json.dumps(cursor_data, sort_keys=True)
@@ -680,9 +737,9 @@ class SearchCache:
 class SearchEngine:
     """Main search engine with automatic backend selection"""
     
-    def __init__(self, settings: Settings, connection_pool: ConnectionPool, redis_client=None):
+    def __init__(self, settings: Settings, connection_pool: ConnectionPool, redis_client=None, db_manager=None):
         self.settings = settings
-        self.postgresql_engine = PostgreSQLSearchEngine(settings, connection_pool)
+        self.postgresql_engine = PostgreSQLSearchEngine(settings, None, db_manager)
         self.opensearch_engine = OpenSearchEngine(settings) if settings.search.use_elasticsearch else None
         self.cache = SearchCache(redis_client, settings) if redis_client else None
         
@@ -751,14 +808,20 @@ class SearchEngine:
         sql = """
         SELECT DISTINCT unnest(sports_keywords) as suggestion
         FROM content_items
-        WHERE sports_keywords && ARRAY[%s]
+        WHERE sports_keywords && ARRAY[:query_param]
         AND is_active = true
-        LIMIT %s
+        LIMIT :limit_param
         """
         
         try:
-            rows = await self.postgresql_engine.pool.fetch(sql, f"%{query}%", limit)
-            return [row['suggestion'] for row in rows]
+            async for session in self.postgresql_engine.db_manager.get_session():
+                from sqlalchemy import text
+                result = await session.execute(text(sql), {
+                    'query_param': f"%{query}%",
+                    'limit_param': limit
+                })
+                rows = result.fetchall()
+                return [row.suggestion for row in rows]
         except Exception as e:
             logger.error(f"Suggestion error: {e}")
             return []
@@ -776,16 +839,15 @@ async def main():
     """Example search usage"""
     
     from libs.common.config import Settings
-    from libs.common.database import ConnectionPool
+    from libs.common.database import DatabaseManager
     
     settings = get_settings()
     
-    # Initialize connection pool
-    pool = ConnectionPool(settings.database.url)
-    await pool.initialize()
+    # Initialize database manager
+    db_manager = DatabaseManager(settings.database.url)
     
     # Initialize search engine
-    search_engine = SearchEngine(settings, pool)
+    search_engine = SearchEngine(settings, None, None, db_manager)
     await search_engine.initialize()
     
     try:
@@ -812,7 +874,7 @@ async def main():
     
     finally:
         await search_engine.close()
-        await pool.close()
+        await db_manager.close()
 
 
 if __name__ == "__main__":

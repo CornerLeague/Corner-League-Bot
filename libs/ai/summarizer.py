@@ -20,6 +20,12 @@ import aiohttp
 from pydantic import BaseModel
 
 from libs.common.config import get_settings, Settings
+from libs.common.test_user_config import (
+    get_test_user_config, 
+    get_dodgers_filter_config, 
+    is_dodgers_relevant_content,
+    calculate_relevance_score
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +152,10 @@ class SportsSummarizer:
         self.settings = settings
         self.deepseek_client = DeepSeekClient(settings)
         
+        # Initialize user preferences for content prioritization
+        self.test_user_config = get_test_user_config()
+        self.dodgers_filter_config = get_dodgers_filter_config()
+        
         # Sports-specific prompts
         self.summary_prompts = {
             "brief": """You are a sports journalist creating concise summaries. 
@@ -191,8 +201,11 @@ class SportsSummarizer:
             focus_areas = []
         
         try:
+            # Filter and prioritize content based on user preferences
+            prioritized_content = self._prioritize_content_by_preferences(content_items)
+            
             # Prepare content for summarization
-            content_text = self._prepare_content_text(content_items, focus_areas)
+            content_text = self._prepare_content_text(prioritized_content, focus_areas)
             
             # Generate summary
             summary_text = await self._generate_summary(
@@ -204,11 +217,11 @@ class SportsSummarizer:
             sentiment = self._analyze_sentiment(summary_text)
             
             # Create citations
-            citations = self._create_citations(content_items, summary_text)
+            citations = self._create_citations(prioritized_content, summary_text)
             
             # Calculate confidence score
             confidence_score = self._calculate_confidence_score(
-                content_items, summary_text, citations
+                prioritized_content, summary_text, citations
             )
             
             generation_time = (time.time() - start_time) * 1000
@@ -245,6 +258,50 @@ class SportsSummarizer:
                 fact_check_status="fallback",
                 word_count=len(fallback_summary.split())
             )
+    
+    def _prioritize_content_by_preferences(self, content_items: List[ContentItem]) -> List[ContentItem]:
+        """Filter and prioritize content based on user preferences (Dodgers focus)"""
+        
+        prioritized_items = []
+        
+        for item in content_items:
+            # Check if content is relevant to Dodgers
+            if is_dodgers_relevant_content(item.title, item.text, item.sports_keywords):
+                # Calculate relevance score for Dodgers content
+                relevance_score = calculate_relevance_score(
+                    item.title, 
+                    item.text, 
+                    item.sports_keywords,
+                    self.test_user_config
+                )
+                
+                # Create a copy of the item with updated relevance score
+                prioritized_item = ContentItem(
+                    id=item.id,
+                    title=item.title,
+                    text=item.text,
+                    source=item.source,
+                    url=item.url,
+                    published_at=item.published_at,
+                    sports_keywords=item.sports_keywords,
+                    quality_score=item.quality_score
+                )
+                
+                prioritized_items.append(prioritized_item)
+        
+        # Sort by relevance score (highest first) and quality score
+        prioritized_items.sort(
+            key=lambda x: (calculate_relevance_score(x.title, x.text, x.sports_keywords, self.test_user_config), x.quality_score),
+            reverse=True
+        )
+        
+        # If no Dodgers content found, return original items but sorted by quality
+        if not prioritized_items:
+            logger.info("No Dodgers-relevant content found, returning all items sorted by quality")
+            return sorted(content_items, key=lambda x: x.quality_score, reverse=True)
+        
+        logger.info(f"Prioritized {len(prioritized_items)} Dodgers-relevant items out of {len(content_items)} total items")
+        return prioritized_items
     
     def _prepare_content_text(self, content_items: List[ContentItem], focus_areas: List[str]) -> str:
         """Prepare content text for summarization"""

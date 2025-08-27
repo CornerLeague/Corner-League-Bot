@@ -279,10 +279,16 @@ class TermExtractor:
 class TrendingDetector:
     """Main trending detection engine"""
     
-    def __init__(self, settings: Settings, connection_pool: ConnectionPool):
+    def __init__(self, settings: Settings, connection_pool: ConnectionPool, db_manager=None):
         self.settings = settings
-        self.pool = connection_pool
         self.extractor = TermExtractor()
+        # Use provided db_manager or create new one
+        if db_manager:
+            self.db_manager = db_manager
+        else:
+            # Import here to avoid circular imports
+            from libs.common.database import DatabaseManager
+            self.db_manager = DatabaseManager(settings.database.url)
         
         # In-memory trending terms cache
         self.trending_terms: Dict[str, TrendingTerm] = {}
@@ -336,7 +342,7 @@ class TrendingDetector:
         trending.sort(key=lambda t: t.trend_score, reverse=True)
         
         # Limit number of trending terms
-        trending = trending[:self.settings.trending.max_trending_terms]
+        trending = trending[:self.settings.trending.max_terms]
         
         self.stats['trending_detected'] = len(trending)
         self.stats['last_update'] = datetime.utcnow()
@@ -446,92 +452,123 @@ class TrendingDetector:
     async def _upsert_term_in_db(self, term: TrendingTerm):
         """Insert or update term in database"""
         
-        query = """
-        INSERT INTO trending_terms (
-            term, normalized_term, term_type, count_1h, count_6h, count_24h,
-            burst_ratio, trend_score, is_trending, trend_start, trend_peak,
-            last_seen, related_terms, sports_context, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
-        ON CONFLICT (normalized_term) DO UPDATE SET
-            term = EXCLUDED.term,
-            term_type = EXCLUDED.term_type,
-            count_1h = EXCLUDED.count_1h,
-            count_6h = EXCLUDED.count_6h,
-            count_24h = EXCLUDED.count_24h,
-            burst_ratio = EXCLUDED.burst_ratio,
-            trend_score = EXCLUDED.trend_score,
-            is_trending = EXCLUDED.is_trending,
-            trend_start = EXCLUDED.trend_start,
-            trend_peak = EXCLUDED.trend_peak,
-            last_seen = EXCLUDED.last_seen,
-            related_terms = EXCLUDED.related_terms,
-            sports_context = EXCLUDED.sports_context,
-            updated_at = NOW()
-        """
-        
-        await self.pool.execute(
-            query,
-            term.term,
-            term.normalized_term,
-            term.term_type,
-            term.count_1h,
-            term.count_6h,
-            term.count_24h,
-            term.burst_ratio,
-            term.trend_score,
-            term.is_trending,
-            term.trend_start,
-            term.trend_peak,
-            term.last_seen,
-            term.related_terms,
-            term.sports_context
-        )
+        async for session in self.db_manager.get_session():
+            from sqlalchemy import text
+            from datetime import datetime
+            
+            query = text("""
+            INSERT INTO trending_terms (
+                term, normalized_term, term_type, count_1h, count_6h, count_24h,
+                burst_ratio, trend_score, is_trending, trend_start, trend_peak,
+                last_seen, related_terms, sports_context, created_at, updated_at
+            ) VALUES (:term, :normalized_term, :term_type, :count_1h, :count_6h, :count_24h,
+                     :burst_ratio, :trend_score, :is_trending, :trend_start, :trend_peak,
+                     :last_seen, :related_terms, :sports_context, :created_at, :updated_at)
+            ON CONFLICT (normalized_term) DO UPDATE SET
+                term = EXCLUDED.term,
+                term_type = EXCLUDED.term_type,
+                count_1h = EXCLUDED.count_1h,
+                count_6h = EXCLUDED.count_6h,
+                count_24h = EXCLUDED.count_24h,
+                burst_ratio = EXCLUDED.burst_ratio,
+                trend_score = EXCLUDED.trend_score,
+                is_trending = EXCLUDED.is_trending,
+                trend_start = EXCLUDED.trend_start,
+                trend_peak = EXCLUDED.trend_peak,
+                last_seen = EXCLUDED.last_seen,
+                related_terms = EXCLUDED.related_terms,
+                sports_context = EXCLUDED.sports_context,
+                updated_at = :updated_at
+            """)
+            
+            now = datetime.utcnow()
+            await session.execute(query, {
+                'term': term.term,
+                'normalized_term': term.normalized_term,
+                'term_type': term.term_type,
+                'count_1h': term.count_1h,
+                'count_6h': term.count_6h,
+                'count_24h': term.count_24h,
+                'burst_ratio': term.burst_ratio,
+                'trend_score': term.trend_score,
+                'is_trending': term.is_trending,
+                'trend_start': term.trend_start,
+                'trend_peak': term.trend_peak,
+                'last_seen': term.last_seen,
+                'related_terms': term.related_terms,
+                'sports_context': term.sports_context,
+                'created_at': now,
+                'updated_at': now
+            })
+            await session.commit()
     
     async def _get_term_counts_from_db(self, normalized_term: str) -> Optional[Dict[str, int]]:
         """Get time-windowed counts for a term"""
         
-        query = """
-        WITH term_occurrences AS (
-            SELECT created_at
-            FROM content_items ci
-            WHERE ci.sports_keywords @> ARRAY[$1]
-            AND ci.created_at >= NOW() - INTERVAL '24 hours'
-            AND ci.is_active = true
-        )
-        SELECT 
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 hour') as count_1h,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '6 hours') as count_6h,
-            COUNT(*) as count_24h
-        FROM term_occurrences
-        """
-        
-        result = await self.pool.fetchrow(query, normalized_term)
-        
-        if result:
-            return {
-                'count_1h': result['count_1h'],
-                'count_6h': result['count_6h'],
-                'count_24h': result['count_24h']
-            }
-        
-        return None
+        async for session in self.db_manager.get_session():
+            from sqlalchemy import text
+            
+            query = text("""
+            WITH term_occurrences AS (
+                SELECT created_at
+                FROM content_items ci
+                WHERE ci.sports_keywords LIKE '%' || :normalized_term || '%'
+                AND ci.created_at >= datetime('now', '-24 hours')
+                AND ci.is_active = 1
+            )
+            SELECT 
+                COUNT(CASE WHEN created_at >= datetime('now', '-1 hour') THEN 1 END) as count_1h,
+                COUNT(CASE WHEN created_at >= datetime('now', '-6 hours') THEN 1 END) as count_6h,
+                COUNT(*) as count_24h
+            FROM term_occurrences
+            """)
+            
+            result = await session.execute(query, {'normalized_term': normalized_term})
+            row = result.fetchone()
+            
+            if row:
+                return {
+                    'count_1h': row.count_1h,
+                    'count_6h': row.count_6h,
+                    'count_24h': row.count_24h
+                }
+            
+            return None
     
     async def _get_recent_terms_from_db(self) -> List[Dict[str, Any]]:
-        """Get recently active terms from database"""
+        """Get recent trending terms from database"""
         
-        query = """
-        SELECT 
-            term, normalized_term, term_type, count_1h, count_6h, count_24h,
-            burst_ratio, trend_score, is_trending, related_terms, sports_context,
-            last_seen
-        FROM trending_terms
-        WHERE last_seen >= NOW() - INTERVAL '24 hours'
-        ORDER BY trend_score DESC
-        LIMIT 1000
-        """
-        
-        rows = await self.pool.fetch(query)
-        return [dict(row) for row in rows]
+        async for session in self.db_manager.get_session():
+            from sqlalchemy import text
+            
+            query = text("""
+                SELECT term, normalized_term, term_type, count_1h, count_6h, count_24h,
+                       burst_ratio, trend_score, is_trending, trend_start, trend_peak,
+                       last_seen, related_terms, sports_context
+                FROM trending_terms
+                WHERE last_seen >= datetime('now', '-24 hours')
+                ORDER BY trend_score DESC
+                LIMIT 1000
+            """)
+            
+            result = await session.execute(query)
+            rows = result.fetchall()
+            return [{
+                'term': row.term,
+                'normalized_term': row.normalized_term,
+                'term_type': row.term_type,
+                'count_1h': row.count_1h,
+                'count_6h': row.count_6h,
+                'count_24h': row.count_24h,
+                'burst_ratio': row.burst_ratio,
+                'trend_score': row.trend_score,
+                'is_trending': row.is_trending,
+                'trend_start': row.trend_start,
+                'trend_peak': row.trend_peak,
+                'last_seen': row.last_seen,
+                'related_terms': row.related_terms,
+                'sports_context': row.sports_context
+            } for row in rows]
     
     def _is_in_cooldown(self, normalized_term: str) -> bool:
         """Check if term is in cooldown period"""
@@ -595,9 +632,9 @@ class TrendingDetector:
 class TrendingDiscoveryLoop:
     """Integrates trending detection with content discovery"""
     
-    def __init__(self, settings: Settings, connection_pool: ConnectionPool):
+    def __init__(self, settings: Settings, connection_pool: ConnectionPool, db_manager=None):
         self.settings = settings
-        self.detector = TrendingDetector(settings, connection_pool)
+        self.detector = TrendingDetector(settings, None, db_manager)
         self.discovery_queue = []  # Would integrate with actual discovery system
     
     async def run_detection_cycle(self) -> Dict[str, Any]:
@@ -655,16 +692,15 @@ async def main():
     """Example trending detection usage"""
     
     from libs.common.config import Settings
-    from libs.common.database import ConnectionPool
+    from libs.common.database import DatabaseManager
     
     settings = get_settings()
     
-    # Initialize connection pool
-    pool = ConnectionPool(settings.database.url)
-    await pool.initialize()
+    # Initialize database manager
+    db_manager = DatabaseManager(settings.database.url)
     
     # Initialize trending loop
-    trending_loop = TrendingDiscoveryLoop(settings, pool)
+    trending_loop = TrendingDiscoveryLoop(settings, None, db_manager)
     
     try:
         # Example content processing
@@ -690,7 +726,7 @@ async def main():
             print(f"  Query: {query['query']} (priority: {query['priority']:.3f})")
     
     finally:
-        await pool.close()
+        await db_manager.close()
 
 
 if __name__ == "__main__":

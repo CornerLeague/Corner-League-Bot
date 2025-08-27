@@ -19,8 +19,14 @@ from pydantic import BaseModel
 
 from libs.common.config import get_settings, Settings
 from libs.common.database import ConnectionPool
-from libs.ingestion.crawler import WebCrawler, CrawlerGuardrails
-from libs.ingestion.extractor import ContentExtractor, CanonicalURLExtractor, DuplicateDetector
+from libs.common.test_user_config import (
+    get_test_user_config, 
+    get_dodgers_filter_config, 
+    is_dodgers_relevant_content,
+    calculate_relevance_score
+)
+from libs.ingestion.crawler import WebCrawler
+from libs.ingestion.extractor import ContentExtractor, URLCanonicalizer, NearDuplicateDetector
 from libs.quality.scorer import QualityGate
 from libs.search.trending import TrendingDiscoveryLoop
 
@@ -53,6 +59,10 @@ class CrawlerWorker:
         self.settings = settings
         self.running = False
         self.shutdown_requested = False
+        
+        # User preferences for content filtering
+        self.test_user_config = get_test_user_config()
+        self.dodgers_filter_config = get_dodgers_filter_config()
         
         # Components
         self.connection_pool: Optional[ConnectionPool] = None
@@ -94,28 +104,21 @@ class CrawlerWorker:
             logger.info("Database connection pool initialized")
             
             # Initialize Redis client
-            self.redis_client = aioredis.from_url(
+            self.redis_client = await aioredis.create_redis_pool(
                 self.settings.redis.url,
-                encoding="utf-8",
-                decode_responses=True
+                encoding="utf-8"
             )
             await self.redis_client.ping()
             logger.info("Redis client initialized")
             
-            # Initialize crawler with guardrails
-            guardrails = CrawlerGuardrails(self.settings)
-            self.crawler = WebCrawler(self.settings, guardrails)
-            await self.crawler.initialize()
+            # Initialize crawler
+            self.crawler = WebCrawler(self.settings)
             logger.info("Web crawler initialized")
             
             # Initialize content extractor
-            canonical_extractor = CanonicalURLExtractor()
-            duplicate_detector = DuplicateDetector(self.redis_client)
-            self.extractor = ContentExtractor(
-                self.settings, 
-                canonical_extractor, 
-                duplicate_detector
-            )
+            canonical_extractor = URLCanonicalizer()
+            duplicate_detector = NearDuplicateDetector()
+            self.extractor = ContentExtractor()
             logger.info("Content extractor initialized")
             
             # Initialize quality gate
@@ -146,7 +149,8 @@ class CrawlerWorker:
             "pid": str(os.getpid()) if 'os' in globals() else "unknown"
         }
         
-        await self.redis_client.hset(worker_key, mapping=worker_data)
+        for key, value in worker_data.items():
+            await self.redis_client.hset(worker_key, key, value)
         await self.redis_client.expire(worker_key, 300)  # 5 minute TTL
     
     async def run(self):
@@ -417,7 +421,26 @@ class CrawlerWorker:
             extraction_time = (time.time() - extraction_start) * 1000
             self.extraction_times.append(extraction_time)
             
-            # Step 3: Check for duplicates
+            # Step 3: User preference filtering (Dodgers content)
+            is_relevant = is_dodgers_relevant_content(
+                extraction_result.title or "",
+                extraction_result.text or "",
+                extraction_result.keywords or []
+            )
+            
+            if not is_relevant:
+                logger.debug(f"Content not relevant to Dodgers fan: {extraction_result.title}")
+                return
+            
+            # Calculate relevance score for personalization
+            relevance_score = calculate_relevance_score(
+                extraction_result.title or "",
+                extraction_result.text or "",
+                extraction_result.keywords or [],
+                extraction_result.content_type
+            )
+            
+            # Step 4: Check for duplicates
             is_duplicate = await self.extractor.duplicate_detector.is_duplicate(
                 extraction_result.content_hash,
                 extraction_result.canonical_url
@@ -427,15 +450,15 @@ class CrawlerWorker:
                 self.stats.duplicates_filtered += 1
                 return
             
-            # Step 4: Quality assessment
+            # Step 5: Quality assessment
             quality_score = await self.quality_gate.assess_quality(extraction_result)
             
             if not self.quality_gate.passes_threshold(quality_score):
                 self.stats.quality_filtered += 1
                 return
             
-            # Step 5: Store content
-            await self._store_content(extraction_result, quality_score)
+            # Step 6: Store content
+            await self._store_content(extraction_result, quality_score, relevance_score)
             self.stats.content_extracted += 1
             
             # Update statistics
@@ -445,7 +468,7 @@ class CrawlerWorker:
             logger.error(f"Error processing URL {url}: {e}")
             self.stats.errors += 1
     
-    async def _store_content(self, extraction_result, quality_score: float):
+    async def _store_content(self, extraction_result, quality_score: float, relevance_score: float = 0.0):
         """Store extracted content in database"""
         
         try:
@@ -456,16 +479,17 @@ class CrawlerWorker:
             query = """
             INSERT INTO content_items (
                 id, title, byline, text, summary, canonical_url, original_url,
-                published_at, quality_score, sports_keywords, content_type,
+                published_at, quality_score, relevance_score, sports_keywords, content_type,
                 image_url, source_id, word_count, language, content_hash,
                 created_at, updated_at, is_active
             ) VALUES (
-                gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, NOW(), NOW(), true
+                gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                $12, $13, $14, $15, $16, NOW(), NOW(), true
             )
             ON CONFLICT (canonical_url) DO UPDATE SET
                 updated_at = NOW(),
-                quality_score = EXCLUDED.quality_score
+                quality_score = EXCLUDED.quality_score,
+                relevance_score = EXCLUDED.relevance_score
             """
             
             await self.connection_pool.execute(
@@ -478,6 +502,7 @@ class CrawlerWorker:
                 extraction_result.original_url,
                 extraction_result.published_at,
                 quality_score,
+                relevance_score,
                 extraction_result.sports_keywords,
                 extraction_result.content_type,
                 extraction_result.image_url,

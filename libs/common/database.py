@@ -152,6 +152,13 @@ class ContentItem(Base):
         Index("idx_content_published", "published_at"),
         Index("idx_content_quality", "quality_score"),
         Index("idx_content_source_active", "source_id", "is_active"),
+        # SQLite-compatible indexes for search performance
+        Index("idx_content_title", "title"),
+        Index("idx_content_summary", "summary"),
+        Index("idx_content_sports_keywords", "sports_keywords"),
+        Index("idx_content_content_type", "content_type"),
+        Index("idx_content_active_quality", "is_active", "quality_score"),
+        Index("idx_content_published_quality", "published_at", "quality_score"),
         # Index("idx_content_search_vector", "search_vector", postgresql_using="gin"),  # PostgreSQL-specific
         # Index("idx_content_sports_keywords", "sports_keywords", postgresql_using="gin"),  # PostgreSQL-specific
     )
