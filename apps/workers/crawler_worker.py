@@ -8,6 +8,7 @@ Implements security, monitoring, and operational excellence.
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 import time
@@ -75,8 +76,8 @@ class CrawlerWorker:
         # Statistics
         self.stats = WorkerStats(
             worker_id=worker_id,
-            start_time=datetime.utcnow(),
-            last_heartbeat=datetime.utcnow()
+            start_time=datetime.now(),
+            last_heartbeat=datetime.now()
         )
         
         # Performance tracking
@@ -113,6 +114,7 @@ class CrawlerWorker:
             
             # Initialize crawler
             self.crawler = WebCrawler(self.settings)
+            self.crawler = await self.crawler.__aenter__()
             logger.info("Web crawler initialized")
             
             # Initialize content extractor
@@ -149,8 +151,9 @@ class CrawlerWorker:
             "pid": str(os.getpid()) if 'os' in globals() else "unknown"
         }
         
-        for key, value in worker_data.items():
-            await self.redis_client.hset(worker_key, key, value)
+        # Set each field individually for Redis compatibility
+        for field, value in worker_data.items():
+            await self.redis_client.hset(worker_key, field, value)
         await self.redis_client.expire(worker_key, 300)  # 5 minute TTL
     
     async def run(self):
@@ -174,7 +177,7 @@ class CrawlerWorker:
                     await self._crawl_cycle()
                     
                     # Brief pause between cycles
-                    await asyncio.sleep(self.settings.crawler.cycle_delay_seconds)
+                    await asyncio.sleep(30)  # Default 30 seconds between cycles
                 
                 except Exception as e:
                     logger.error(f"Error in crawl cycle: {e}")
@@ -221,7 +224,7 @@ class CrawlerWorker:
             logger.info(f"Worker {self.worker_id} crawling {len(urls_to_crawl)} URLs")
             
             # Process URLs in batches
-            batch_size = self.settings.crawler.batch_size
+            batch_size = 10  # Hardcoded batch size for now
             for i in range(0, len(urls_to_crawl), batch_size):
                 batch = urls_to_crawl[i:i + batch_size]
                 await self._process_url_batch(batch)
@@ -241,62 +244,96 @@ class CrawlerWorker:
             self.stats.current_status = "idle"
     
     async def _get_crawl_urls(self) -> List[str]:
-        """Get URLs to crawl from discovery sources"""
+        """Get URLs to crawl from discovery sources - RSS feeds only"""
         
         urls = []
         
         try:
-            # Get URLs from RSS feeds
+            # Get URLs from RSS feeds only - focusing on major sports sources
             rss_urls = await self._get_rss_urls()
+            logger.info(f"RSS discovery returned {len(rss_urls)} URLs")
             urls.extend(rss_urls)
             
-            # Get URLs from search discovery
-            search_urls = await self._get_search_discovery_urls()
-            urls.extend(search_urls)
+            # Disable search discovery to focus only on RSS feeds
+            # search_urls = await self._get_search_discovery_urls()
+            # logger.info(f"Search discovery returned {len(search_urls)} URLs")
+            # urls.extend(search_urls)
+            logger.info("Search discovery disabled - using RSS feeds only")
             
-            # Get URLs from sitemap discovery
-            sitemap_urls = await self._get_sitemap_urls()
-            urls.extend(sitemap_urls)
+            # Disable sitemap discovery to focus on RSS feeds
+            # sitemap_urls = await self._get_sitemap_urls()
+            # logger.info(f"Sitemap discovery returned {len(sitemap_urls)} URLs")
+            # urls.extend(sitemap_urls)
+            logger.info("Sitemap discovery disabled - using RSS feeds only")
             
             # Remove duplicates and limit
             unique_urls = list(set(urls))
-            return unique_urls[:self.settings.crawler.max_urls_per_cycle]
+            logger.info(f"Total unique URLs to process: {len(unique_urls)}")
+            
+            # Log first few URLs for debugging
+            if unique_urls:
+                logger.info(f"Sample URLs to crawl: {unique_urls[:3]}")
+            
+            return unique_urls[:100]  # Increased limit for better RSS coverage
         
         except Exception as e:
             logger.error(f"Error getting crawl URLs: {e}")
             return []
     
+    async def get_comprehensive_sports_rss_feeds(self) -> List[str]:
+        """Get comprehensive list of sports RSS feeds"""
+        return [
+            # Major sports news
+            "http://rss.cnn.com/rss/edition_sport.rss",
+            "https://feeds.bbci.co.uk/sport/rss.xml",
+            "https://www.espn.com/espn/rss/news",
+            "https://www.si.com/rss/si_topstories.rss",
+            "https://bleacherreport.com/articles/feed",
+            "https://www.cbssports.com/rss/headlines/",
+            "https://sports.yahoo.com/rss/",
+            "https://www.foxsports.com/rss/sports",
+            
+            # League-specific feeds
+            "https://www.nba.com/rss/nba_rss.xml",
+            "https://www.nfl.com/feeds/rss/news",
+            "https://www.mlb.com/feeds/news/rss.xml",
+            "https://www.nhl.com/rss/news",
+            
+            # International sports
+            "https://www.skysports.com/rss/12040",
+            "https://www.goal.com/feeds/en/news",
+            "https://www.eurosport.com/rss.xml",
+            
+            # College sports
+            "https://www.ncaa.com/news/rss.xml",
+            "https://www.collegeinsider.com/rss.php",
+            
+            # Fantasy and analysis
+            "https://www.fantasypros.com/rss/news.xml",
+            "https://www.rotowire.com/rss/news.htm"
+        ]
+    
     async def _get_rss_urls(self) -> List[str]:
         """Get URLs from RSS feed monitoring"""
         
         try:
-            # Get active RSS feeds from database
-            query = """
-            SELECT url, last_crawled 
-            FROM rss_feeds 
-            WHERE is_active = true 
-            AND (last_crawled IS NULL OR last_crawled < NOW() - INTERVAL '1 hour')
-            ORDER BY priority DESC, last_crawled ASC NULLS FIRST
-            LIMIT 50
-            """
-            
-            rows = await self.connection_pool.fetch(query)
+            # Get comprehensive list of sports RSS feeds
+            rss_feeds = await self.get_comprehensive_sports_rss_feeds()
             
             urls = []
-            for row in rows:
-                feed_url = row['url']
-                
-                # Parse RSS feed and extract article URLs
-                feed_urls = await self.crawler.parse_rss_feed(feed_url)
-                urls.extend(feed_urls)
-                
-                # Update last crawled timestamp
-                await self.connection_pool.execute(
-                    "UPDATE rss_feeds SET last_crawled = NOW() WHERE url = $1",
-                    feed_url
-                )
+            for feed_url in rss_feeds:
+                try:
+                    # Parse RSS feed and extract article URLs
+                    if self.crawler:
+                        feed_urls = await self.crawler.discovery_engine.discover_from_rss(feed_url)
+                        urls.extend(feed_urls)
+                        logger.info(f"Discovered {len(feed_urls)} URLs from {feed_url}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse RSS feed {feed_url}: {e}")
+                    continue
             
-            return urls
+            logger.info(f"Total RSS URLs discovered: {len(urls)}")
+            return urls[:50]  # Limit to 50 URLs for better coverage
         
         except Exception as e:
             logger.error(f"Error getting RSS URLs: {e}")
@@ -329,41 +366,11 @@ class CrawlerWorker:
             return []
     
     async def _get_sitemap_urls(self) -> List[str]:
-        """Get URLs from sitemap discovery"""
+        """Get URLs from sitemap discovery - DISABLED for RSS-only mode"""
         
-        try:
-            # Get sources that need sitemap crawling
-            query = """
-            SELECT domain, sitemap_url, last_sitemap_crawl
-            FROM sources 
-            WHERE is_active = true 
-            AND sitemap_url IS NOT NULL
-            AND (last_sitemap_crawl IS NULL OR last_sitemap_crawl < NOW() - INTERVAL '6 hours')
-            ORDER BY priority DESC, last_sitemap_crawl ASC NULLS FIRST
-            LIMIT 10
-            """
-            
-            rows = await self.connection_pool.fetch(query)
-            
-            urls = []
-            for row in rows:
-                sitemap_url = row['sitemap_url']
-                
-                # Parse sitemap and extract URLs
-                sitemap_urls = await self.crawler.parse_sitemap(sitemap_url)
-                urls.extend(sitemap_urls)
-                
-                # Update last crawled timestamp
-                await self.connection_pool.execute(
-                    "UPDATE sources SET last_sitemap_crawl = NOW() WHERE domain = $1",
-                    row['domain']
-                )
-            
-            return urls
-        
-        except Exception as e:
-            logger.error(f"Error getting sitemap URLs: {e}")
-            return []
+        # Sitemap discovery is completely disabled to focus on RSS feeds only
+        logger.info("Sitemap discovery is disabled - using RSS feeds only")
+        return []
     
     async def _process_url_batch(self, urls: List[str]):
         """Process a batch of URLs"""
@@ -374,7 +381,7 @@ class CrawlerWorker:
             tasks.append(task)
         
         # Process with concurrency limit
-        semaphore = asyncio.Semaphore(self.settings.crawler.max_concurrent_requests)
+        semaphore = asyncio.Semaphore(5)  # Default concurrent requests limit
         
         async def process_with_semaphore(task):
             async with semaphore:
@@ -399,7 +406,7 @@ class CrawlerWorker:
         try:
             # Step 1: Crawl the page
             crawl_result = await self.crawler.crawl_url(url)
-            if not crawl_result.success:
+            if not crawl_result or crawl_result.get("status_code", 0) >= 400:
                 return
             
             crawl_time = (time.time() - crawl_start) * 1000
@@ -409,13 +416,12 @@ class CrawlerWorker:
             # Step 2: Extract content
             extraction_start = time.time()
             
-            extraction_result = await self.extractor.extract_content(
-                crawl_result.html,
-                url,
-                crawl_result.final_url
+            extraction_result = self.extractor.extract_content(
+                crawl_result["content"],
+                crawl_result.get("final_url", url)
             )
             
-            if not extraction_result.success:
+            if not extraction_result.get("extraction_success", False):
                 return
             
             extraction_time = (time.time() - extraction_start) * 1000
@@ -423,27 +429,27 @@ class CrawlerWorker:
             
             # Step 3: User preference filtering (Dodgers content)
             is_relevant = is_dodgers_relevant_content(
-                extraction_result.title or "",
-                extraction_result.text or "",
-                extraction_result.keywords or []
+                extraction_result.get("title", ""),
+                extraction_result.get("text", ""),
+                extraction_result.get("sports_keywords", [])
             )
             
             if not is_relevant:
-                logger.debug(f"Content not relevant to Dodgers fan: {extraction_result.title}")
+                logger.debug(f"Content not relevant to Dodgers fan: {extraction_result.get('title', '')}")
                 return
             
             # Calculate relevance score for personalization
             relevance_score = calculate_relevance_score(
-                extraction_result.title or "",
-                extraction_result.text or "",
-                extraction_result.keywords or [],
-                extraction_result.content_type
+                extraction_result.get("title", ""),
+                extraction_result.get("text", ""),
+                extraction_result.get("sports_keywords", []),
+                extraction_result.get("content_type")
             )
             
             # Step 4: Check for duplicates
             is_duplicate = await self.extractor.duplicate_detector.is_duplicate(
-                extraction_result.content_hash,
-                extraction_result.canonical_url
+                extraction_result.get("content_hash"),
+                extraction_result.get("canonical_url")
             )
             
             if is_duplicate:
@@ -451,11 +457,23 @@ class CrawlerWorker:
                 return
             
             # Step 5: Quality assessment
-            quality_score = await self.quality_gate.assess_quality(extraction_result)
+            # Create source info for quality gate
+            source_info = {
+                'domain': extraction_result.get('source_domain', 'unknown'),
+                'name': extraction_result.get('source_name', 'Unknown'),
+                'quality_tier': 2,  # Default tier
+                'reputation_score': 0.7,  # Default reputation
+                'success_rate': 0.9  # Default success rate
+            }
             
-            if not self.quality_gate.passes_threshold(quality_score):
+            quality_result = self.quality_gate.process_content(extraction_result, source_info)
+            
+            if not quality_result['should_accept']:
                 self.stats.quality_filtered += 1
+                logger.info(f"Content filtered by quality gate: {quality_result['decision_reason']}")
                 return
+            
+            quality_score = quality_result['quality_result']['quality_score']
             
             # Step 6: Store content
             await self._store_content(extraction_result, quality_score, relevance_score)
@@ -472,45 +490,54 @@ class CrawlerWorker:
         """Store extracted content in database"""
         
         try:
+            from libs.common.database import DatabaseManager, ContentItem, Source
+            from sqlalchemy import select
+            from urllib.parse import urlparse
+            import uuid
+            
             # Get or create source
-            source_id = await self._get_or_create_source(extraction_result.source_domain)
+            domain = urlparse(extraction_result.get("canonical_url")).netloc
+            source_id = await self._get_or_create_source(domain)
             
-            # Insert content item
-            query = """
-            INSERT INTO content_items (
-                id, title, byline, text, summary, canonical_url, original_url,
-                published_at, quality_score, relevance_score, sports_keywords, content_type,
-                image_url, source_id, word_count, language, content_hash,
-                created_at, updated_at, is_active
-            ) VALUES (
-                gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, $16, NOW(), NOW(), true
-            )
-            ON CONFLICT (canonical_url) DO UPDATE SET
-                updated_at = NOW(),
-                quality_score = EXCLUDED.quality_score,
-                relevance_score = EXCLUDED.relevance_score
-            """
-            
-            await self.connection_pool.execute(
-                query,
-                extraction_result.title,
-                extraction_result.byline,
-                extraction_result.text,
-                extraction_result.summary,
-                extraction_result.canonical_url,
-                extraction_result.original_url,
-                extraction_result.published_at,
-                quality_score,
-                relevance_score,
-                extraction_result.sports_keywords,
-                extraction_result.content_type,
-                extraction_result.image_url,
-                source_id,
-                extraction_result.word_count,
-                extraction_result.language,
-                extraction_result.content_hash
-            )
+            # Use SQLAlchemy session
+            db_manager = DatabaseManager()
+            async with db_manager.get_session() as session:
+                # Check if content already exists
+                existing = await session.execute(
+                    select(ContentItem).where(ContentItem.canonical_url == extraction_result.get("canonical_url"))
+                )
+                existing_item = existing.scalar_one_or_none()
+                
+                if existing_item:
+                    # Update existing item
+                    existing_item.quality_score = quality_score
+                    existing_item.relevance_score = relevance_score
+                    existing_item.updated_at = datetime.now()
+                else:
+                    # Create new content item
+                    content_item = ContentItem(
+                        id=str(uuid.uuid4()),
+                        title=extraction_result.get("title"),
+                        byline=extraction_result.get("byline"),
+                        text=extraction_result.get("text"),
+                        summary=extraction_result.get("summary"),
+                        canonical_url=extraction_result.get("canonical_url"),
+                        original_url=extraction_result.get("url"),
+                        published_at=extraction_result.get("published_at"),
+                        quality_score=quality_score,
+                        relevance_score=relevance_score,
+                        sports_keywords=extraction_result.get("sports_keywords", []),
+                        content_type=extraction_result.get("content_type"),
+                        image_url=extraction_result.get("image_url"),
+                        source_id=source_id,
+                        word_count=extraction_result.get("word_count", 0),
+                        language=extraction_result.get("language"),
+                        content_hash=extraction_result.get("content_hash"),
+                        is_active=True
+                    )
+                    session.add(content_item)
+                
+                await session.commit()
         
         except Exception as e:
             logger.error(f"Error storing content: {e}")
@@ -520,23 +547,32 @@ class CrawlerWorker:
         """Get or create source record"""
         
         try:
-            # Try to get existing source
-            source_id = await self.connection_pool.fetchval(
-                "SELECT id FROM sources WHERE domain = $1",
-                domain
-            )
+            from libs.common.database import DatabaseManager, Source
+            from sqlalchemy import select
+            import uuid
             
-            if source_id:
-                return source_id
-            
-            # Create new source
-            source_id = await self.connection_pool.fetchval("""
-                INSERT INTO sources (id, domain, name, is_active, created_at, updated_at)
-                VALUES (gen_random_uuid(), $1, $2, true, NOW(), NOW())
-                RETURNING id
-            """, domain, domain.replace('www.', '').title())
-            
-            return source_id
+            db_manager = DatabaseManager()
+            async with db_manager.get_session() as session:
+                # Try to get existing source
+                result = await session.execute(
+                    select(Source).where(Source.domain == domain)
+                )
+                existing_source = result.scalar_one_or_none()
+                
+                if existing_source:
+                    return existing_source.id
+                
+                # Create new source
+                source = Source(
+                    id=str(uuid.uuid4()),
+                    domain=domain,
+                    name=domain.replace('www.', '').title(),
+                    is_active=True
+                )
+                session.add(source)
+                await session.commit()
+                
+                return source.id
         
         except Exception as e:
             logger.error(f"Error getting/creating source for {domain}: {e}")
@@ -578,7 +614,7 @@ class CrawlerWorker:
     async def _send_heartbeat(self):
         """Send heartbeat with current statistics"""
         
-        self.stats.last_heartbeat = datetime.utcnow()
+        self.stats.last_heartbeat = datetime.now()
         
         # Get system metrics
         try:
@@ -605,7 +641,9 @@ class CrawlerWorker:
             "cpu_usage_percent": f"{self.stats.cpu_usage_percent:.1f}"
         }
         
-        await self.redis_client.hset(worker_key, mapping=worker_data)
+        # Set each field individually
+        for field, value in worker_data.items():
+            await self.redis_client.hset(worker_key, field, value)
         await self.redis_client.expire(worker_key, 300)  # 5 minute TTL
     
     async def _trending_discovery_loop(self):
@@ -613,7 +651,10 @@ class CrawlerWorker:
         
         while self.running and not self.shutdown_requested:
             try:
-                await self.trending_loop.run_discovery_cycle()
+                # Simple trending discovery - just detect trending terms
+                if self.trending_loop and hasattr(self.trending_loop, 'detector'):
+                    trending_terms = await self.trending_loop.detector.detect_trending()
+                    logger.info(f"Detected {len(trending_terms)} trending terms")
                 await asyncio.sleep(300)  # Run every 5 minutes
             
             except asyncio.CancelledError:
@@ -636,7 +677,7 @@ class CrawlerWorker:
             
             # Close connections
             if self.crawler:
-                await self.crawler.close()
+                await self.crawler.__aexit__(None, None, None)
             
             if self.connection_pool:
                 await self.connection_pool.close()

@@ -361,8 +361,8 @@ class GoldenCorpusTest:
                     final_url = str(response.url)
             
             # Extract content
-            extraction_result = await self.extractor.extract_content(
-                html, golden_url.url, final_url
+            extraction_result = self.extractor.extract_content(
+                html, golden_url.url
             )
             
             if not extraction_result.success:

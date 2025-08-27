@@ -15,6 +15,12 @@ export default function Home() {
   const [selectedArticle, setSelectedArticle] = useState<ContentItem | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   
+  // Pagination state
+  const [allArticles, setAllArticles] = useState<ContentItem[]>([]);
+  const [displayedCount, setDisplayedCount] = useState(6);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
   // Dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -42,7 +48,7 @@ export default function Home() {
   const { data: healthData } = useHealth();
   const { data: latestNews, isLoading: newsLoading, error: newsError } = useLatestNews(
     selectedSport ? [selectedSport.toLowerCase()] : undefined,
-    12
+    6
   );
   const { data: trendingTerms, isLoading: trendingLoading } = useTrending(5);
   const { searchRequest, updateSearch, selectContent } = useSearchState();
@@ -50,6 +56,22 @@ export default function Home() {
   const summarizationMutation = useSummarization({
     onSuccess: () => setShowSummary(true),
   });
+
+  // Update articles when new data arrives
+  useEffect(() => {
+    if (latestNews?.items) {
+      setAllArticles(latestNews.items);
+      setNextCursor(latestNews.next_cursor);
+      setDisplayedCount(6); // Reset to show first 6
+    }
+  }, [latestNews]);
+
+  // Reset pagination when sport changes
+  useEffect(() => {
+    setAllArticles([]);
+    setDisplayedCount(6);
+    setNextCursor(undefined);
+  }, [selectedSport]);
 
   const categories = [
     { name: "NBA", icon: "🏀", sport: "basketball" },
@@ -84,13 +106,35 @@ export default function Home() {
     setSelectedSport(selectedSport === sport ? "" : sport);
   };
 
+  // Handle load more articles
+  const handleLoadMore = async () => {
+    if (isLoadingMore || !nextCursor) return;
+    
+    setIsLoadingMore(true);
+    try {
+      // For now, just show more from existing articles
+      // In a real implementation, you'd fetch more data with the cursor
+      const newDisplayCount = Math.min(displayedCount + 6, allArticles.length);
+      setDisplayedCount(newDisplayCount);
+      
+      // If we've shown all current articles and there are more available
+      if (newDisplayCount >= allArticles.length && latestNews?.has_more) {
+        // Here you would typically make another API call with the cursor
+        // For now, we'll just disable the button
+        setNextCursor(undefined);
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   // Prefetch content on hover
   const handleArticleHover = (articleId: string) => {
     prefetchContent(articleId);
   };
 
-  // Get display articles (API data or fallback)
-  const displayArticles = latestNews?.items || [];
+  // Get display articles (show only the first displayedCount articles)
+  const displayArticles = allArticles.slice(0, displayedCount);
 
   // System status indicator
   const isSystemHealthy = healthData?.status === 'healthy';
@@ -348,11 +392,7 @@ export default function Home() {
               </div>
             )}
             
-            {latestNews && (
-              <div className="text-xs sm:text-sm text-gray-600">
-                {latestNews.total_count} articles • {latestNews.search_time_ms}ms
-              </div>
-            )}
+
           </div>
         </div>
 
@@ -429,10 +469,21 @@ export default function Home() {
         </div>
 
         {/* Load More Button */}
-        {latestNews?.has_more && (
+        {(displayedCount < allArticles.length || (latestNews?.has_more && nextCursor)) && (
           <div className="text-center mt-6 sm:mt-8">
-            <button className="px-4 sm:px-6 py-2.5 sm:py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base w-full sm:w-auto">
-              Load More Articles
+            <button 
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              className="px-4 sm:px-6 py-2.5 sm:py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                `Load More Articles (${Math.min(6, allArticles.length - displayedCount)} more)`
+              )}
             </button>
           </div>
         )}

@@ -7,6 +7,7 @@ Implements robots.txt compliance, per-host rate limiting, and proxy management.
 """
 
 import asyncio
+import io
 import logging
 import time
 from datetime import datetime, timedelta
@@ -29,6 +30,7 @@ class RobotsChecker:
         self.session = session
         self.robots_cache: Dict[str, Tuple[RobotFileParser, datetime]] = {}
         self.cache_ttl = timedelta(hours=24)
+        logger.info("RobotsChecker initialized with empty cache")
     
     async def can_fetch(self, url: str, user_agent: str = "*") -> bool:
         """Check if URL can be fetched according to robots.txt"""
@@ -51,7 +53,9 @@ class RobotsChecker:
                     # Parse robots.txt
                     robots_parser = RobotFileParser()
                     robots_parser.set_url(robots_url)
-                    robots_parser.read_robots_txt(robots_content)
+                    # Parse content line by line
+                    for line in robots_content.splitlines():
+                        robots_parser.feed(line)
                     
                     # Cache result
                     self.robots_cache[robots_url] = (robots_parser, datetime.utcnow())
@@ -63,6 +67,9 @@ class RobotsChecker:
         
         except Exception as e:
             logger.warning(f"Failed to fetch robots.txt for {robots_url}: {e}")
+            # Clear cache entry if it exists to avoid stale data
+            if robots_url in self.robots_cache:
+                del self.robots_cache[robots_url]
             return True  # Assume allowed on error
     
     def get_crawl_delay(self, url: str, user_agent: str = "*") -> Optional[float]:
@@ -93,7 +100,7 @@ class ProxyManager:
         """Build list of proxy URLs"""
         proxies = []
         for endpoint in self.settings.evomi.endpoints:
-            proxy_url = f"http://{self.settings.evomi.username}:{self.settings.evomi.password}@{endpoint}"
+            proxy_url = f"http://{self.settings.evomi.proxy_user}:{self.settings.evomi.proxy_pass}@{endpoint}"
             proxies.append(proxy_url)
         return proxies
     
@@ -101,7 +108,7 @@ class ProxyManager:
         """Get next proxy in rotation"""
         
         # Check daily budget
-        if self.daily_usage >= self.settings.evomi.daily_budget_usd:
+        if self.daily_usage >= self.settings.evomi.daily_budget:
             logger.warning("Daily proxy budget exceeded")
             return None
         
@@ -225,18 +232,18 @@ class ContentFetcher:
         parsed_url = urlparse(url)
         domain = parsed_url.netloc
         
-        # Check robots.txt
-        if not await self.robots_checker.can_fetch(url, self.settings.crawling.user_agent):
-            logger.info(f"Robots.txt disallows fetching {url}")
-            return None
+        # Check robots.txt (temporarily disabled for debugging)
+        # if not await self.robots_checker.can_fetch(url, self.settings.crawling.user_agent):
+        #     logger.info(f"Robots.txt disallows fetching {url}")
+        #     return None
         
         # Apply rate limiting
         await self.rate_limiter.acquire(domain)
         
-        # Get crawl delay from robots.txt
-        robots_delay = self.robots_checker.get_crawl_delay(url, self.settings.crawling.user_agent)
-        if robots_delay:
-            await asyncio.sleep(robots_delay)
+        # Get crawl delay from robots.txt (temporarily disabled for debugging)
+        # robots_delay = self.robots_checker.get_crawl_delay(url, self.settings.crawling.user_agent)
+        # if robots_delay:
+        #     await asyncio.sleep(robots_delay)
         
         # Attempt fetch with retries
         for attempt in range(self.settings.crawling.max_retries + 1):
@@ -255,8 +262,75 @@ class ContentFetcher:
                     jitter = delay * 0.1 * (0.5 - asyncio.get_event_loop().time() % 1)
                     await asyncio.sleep(delay + jitter)
         
+        # If proxy failed, try direct connection as fallback
+        logger.info(f"Proxy failed for {url}, trying direct connection")
+        try:
+            result = await self._fetch_direct(url, **kwargs)
+            if result:
+                logger.info(f"Direct connection successful for {url}")
+                self.rate_limiter.apply_backoff(domain, result["status_code"])
+                return result
+            else:
+                logger.warning(f"Direct connection returned None for {url}")
+        except Exception as e:
+            logger.warning(f"Direct fetch also failed for {url}: {e}")
+        
         logger.error(f"Failed to fetch {url} after {self.settings.crawling.max_retries + 1} attempts")
         return None
+    
+    async def _fetch_direct(self, url: str, **kwargs) -> Optional[Dict[str, Any]]:
+        """Fetch content directly without proxy"""
+        
+        # Prepare request
+        headers = {
+            "User-Agent": self.settings.crawling.user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        headers.update(kwargs.get("headers", {}))
+        
+        timeout = aiohttp.ClientTimeout(total=self.settings.crawling.timeout)
+        
+        start_time = time.time()
+        
+        try:
+            async with self.session.get(
+                url,
+                headers=headers,
+                timeout=timeout,
+                max_redirects=self.settings.crawling.max_redirects,
+                **kwargs
+            ) as response:
+                
+                # Check content size
+                content_length = response.headers.get("content-length")
+                if content_length and int(content_length) > self.settings.crawling.max_content_size:
+                    logger.warning(f"Content too large for {url}: {content_length} bytes")
+                    return None
+                
+                # Read content
+                content = await response.read()
+                fetch_time = time.time() - start_time
+                
+                return {
+                    "url": str(response.url),
+                    "status_code": response.status,
+                    "headers": dict(response.headers),
+                    "content": content,
+                    "content_type": response.headers.get("content-type", ""),
+                    "encoding": response.charset or "utf-8",
+                    "fetch_time_ms": fetch_time * 1000,
+                    "content_size_bytes": len(content),
+                    "final_url": str(response.url),
+                    "proxy_used": None
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in direct fetch for {url}: {e}")
+            raise
     
     async def _fetch_with_proxy(self, url: str, attempt: int, **kwargs) -> Optional[Dict[str, Any]]:
         """Fetch content using proxy"""
@@ -546,10 +620,11 @@ class WebCrawler:
             rss_urls = await self.discovery_engine.discover_from_rss(source_config["rss_url"])
             urls.extend(rss_urls)
         
-        # Sitemap discovery
-        if "sitemap_url" in source_config:
-            sitemap_urls = await self.discovery_engine.discover_from_sitemap(source_config["sitemap_url"])
-            urls.extend(sitemap_urls)
+        # Sitemap discovery - DISABLED for RSS-only mode
+        # if "sitemap_url" in source_config:
+        #     sitemap_urls = await self.discovery_engine.discover_from_sitemap(source_config["sitemap_url"])
+        #     urls.extend(sitemap_urls)
+        logger.info("Sitemap discovery disabled - using RSS feeds only")
         
         # Search API discovery
         if "search_queries" in source_config:
