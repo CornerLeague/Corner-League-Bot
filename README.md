@@ -4,7 +4,7 @@ A production-ready, AI-powered sports media discovery and personalization platfo
 
 ## 🏆 Overview
 
-Corner League Bot is an enterprise-grade system that provides personalized sports news feeds through intelligent web-scale content discovery, AI-powered summarization, and sophisticated ranking algorithms. Built for scalability and reliability, it can handle 10,000+ concurrent users with sub-100ms search response times.
+Corner League Bot is an enterprise-grade system that provides personalized sports news feeds through intelligent web-scale content discovery, AI-powered summarization, and sophisticated ranking algorithms. 
 
 ### Key Features
 
