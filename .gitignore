@@ -202,3 +202,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Analysis and documentation files
+codebase_analysis.md
+development_todo_list.md
