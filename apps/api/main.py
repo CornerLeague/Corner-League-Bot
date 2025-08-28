@@ -29,6 +29,9 @@ from libs.ingestion.extractor import ContentExtractor
 from libs.quality.scorer import QualityGate
 from libs.search.engine import SearchEngine, SearchQuery
 from libs.search.trending import TrendingDiscoveryLoop
+from libs.auth import ClerkAuthMiddleware, get_clerk_config, get_user_service
+from libs.auth.decorators import require_auth, optional_auth, require_role
+from .auth_routes import router as auth_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +44,8 @@ db_manager: Optional[DatabaseManager] = None
 search_engine: Optional[SearchEngine] = None
 trending_loop: Optional[TrendingDiscoveryLoop] = None
 quality_gate: Optional[QualityGate] = None
+clerk_config = get_clerk_config()
+user_service = get_user_service()
 
 
 # Pydantic models
@@ -247,8 +252,12 @@ app.add_middleware(
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ClerkAuthMiddleware)
 
-# Security
+# Include authentication routes
+app.include_router(auth_router)
+
+# Security (Clerk handles JWT validation)
 security = HTTPBearer(auto_error=False)
 
 
@@ -288,13 +297,15 @@ async def get_db_manager() -> DatabaseManager:
     return db_manager
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[str]:
-    """Verify JWT token (placeholder implementation)"""
-    if not credentials:
-        return None
-    
-    # TODO: Implement JWT verification
-    return credentials.credentials
+async def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
+    """Get current authenticated user from request context."""
+    return getattr(request.state, 'user', None)
+
+
+async def get_user_id(request: Request) -> Optional[str]:
+    """Get current user ID from request context."""
+    user = getattr(request.state, 'user', None)
+    return user.get('sub') if user else None
 
 
 # API Routes
@@ -343,11 +354,31 @@ async def health_check(
 @app.post("/api/search", response_model=SearchResponse)
 async def search_content(
     request: SearchRequest,
-    engine: SearchEngine = Depends(get_search_engine)
+    http_request: Request,
+    engine: SearchEngine = Depends(get_search_engine),
+    user_info: Optional[dict] = Depends(optional_auth)
 ) -> SearchResponse:
     """Search sports content"""
     
     try:
+        # Track user activity if authenticated
+        user_id = await get_user_id(http_request)
+        if user_id:
+            await user_service.track_activity(
+                user_id=user_id,
+                action="search",
+                resource_type="content",
+                resource_id=None,
+                metadata={
+                    "query": request.query,
+                    "sports": request.sports,
+                    "sources": request.sources,
+                    "content_types": request.content_types,
+                    "sort_by": request.sort_by,
+                    "limit": request.limit
+                }
+            )
+        
         # Create search query
         search_query = SearchQuery(
             query=request.query,
@@ -498,7 +529,9 @@ async def get_trending_terms(
 @app.post("/api/summarize", response_model=SummaryResponse)
 async def summarize_content(
     request: SummaryRequest,
-    pool: ConnectionPool = Depends(get_connection_pool)
+    http_request: Request,
+    pool: ConnectionPool = Depends(get_connection_pool),
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth)
 ) -> SummaryResponse:
     """Generate AI summary of content items"""
     
@@ -554,6 +587,21 @@ async def summarize_content(
         )
         
         generation_time = (time.time() - start_time) * 1000
+        
+        # Track user activity
+        user_id = await get_user_id(http_request)
+        if user_id:
+            await user_service.track_user_activity(
+                user_id=user_id,
+                action="summarize",
+                resource_type="content_batch",
+                resource_id=",".join(request.content_ids),
+                metadata={
+                    "summary_type": request.summary_type,
+                    "content_count": len(rows),
+                    "focus_areas": request.focus_areas
+                }
+            )
         
         return SummaryResponse(
             summary=summary_text,
@@ -627,32 +675,9 @@ async def get_platform_stats(
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
-# User preferences endpoints (placeholder)
-@app.get("/api/user/preferences", response_model=UserPreferences)
-async def get_user_preferences(
-    token: Optional[str] = Depends(verify_token)
-) -> UserPreferences:
-    """Get user preferences"""
-    
-    # Placeholder implementation
-    return UserPreferences(
-        favorite_teams=["Lakers", "Warriors"],
-        favorite_sports=["basketball", "nba"],
-        content_types=["game_recap", "breaking_news"],
-        quality_threshold=0.6,
-        language="en"
-    )
-
-
-@app.post("/api/user/preferences", response_model=UserPreferences)
-async def update_user_preferences(
-    preferences: UserPreferences,
-    token: Optional[str] = Depends(verify_token)
-) -> UserPreferences:
-    """Update user preferences"""
-    
-    # Placeholder implementation
-    return preferences
+# Note: User preferences endpoints have been moved to auth_routes.py
+# These endpoints are now handled by the dedicated authentication router
+# with proper Clerk integration and user management
 
 
 # Helper functions

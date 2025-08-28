@@ -9,6 +9,7 @@ import {
   useHealth
 } from "../hooks/useSportsData";
 import { type ContentItem } from "../lib/api";
+import { AuthButton } from "@/components/auth";
 
 export default function Home() {
   const [selectedSport, setSelectedSport] = useState<string>("");
@@ -23,9 +24,7 @@ export default function Home() {
   
   // Dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const userDropdownRef = useRef<HTMLDivElement>(null);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -33,16 +32,13 @@ export default function Home() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
-      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
-        setIsUserDropdownOpen(false);
-      }
     }
     
-    if (isDropdownOpen || isUserDropdownOpen) {
+    if (isDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isDropdownOpen, isUserDropdownOpen]);
+  }, [isDropdownOpen]);
 
   // API hooks
   const { data: healthData } = useHealth();
@@ -182,29 +178,8 @@ export default function Home() {
             )}
           </div>
           
-          {/* User Icon */}
-          <div className="flex items-center relative" ref={userDropdownRef}>
-            <button 
-              onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-black rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors"
-            >
-              <User className="text-white w-2.5 h-2.5 sm:w-3 sm:h-3" />
-            </button>
-            
-            {/* User Dropdown Menu */}
-            {isUserDropdownOpen && (
-              <div className="absolute top-full right-0 mt-2 w-40 sm:w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="py-1">
-                  <button className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                    Account Settings
-                  </button>
-                  <button className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Authentication Button */}
+          <AuthButton variant="outline" size="sm" />
         </div>
       </nav>
 

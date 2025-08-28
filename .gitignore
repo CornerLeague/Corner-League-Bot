@@ -207,3 +207,8 @@ cython_debug/
 # Analysis and documentation files
 codebase_analysis.md
 development_todo_list.md
+
+# Documentation
+*.md
+!README.md
+!clerk_auth_implementation_plan.md
