@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from typing import List
 from pydantic import BaseModel
 
 from libs.auth.decorators import require_auth, require_admin
-from libs.auth.user_service import UserService, UserProfile
+from libs.auth.user_service import UserService
 from libs.api.response import ApiResponse
 from libs.api.mappers import map_user_profile_to_response
 
@@ -41,9 +42,11 @@ class RoleRemovalRequest(BaseModel):
     role: str
 
 @router.get("/profile", response_model=ApiResponse[UserProfileResponse])
-@require_auth
-async def get_user_profile(user_id: str = Depends(require_auth)):
+async def get_user_profile(
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth)
+):
     """Get the current user's profile."""
+    user_id = credentials.user_id
     user_service = UserService()
     profile = await user_service.get_user_profile(user_id)
     
@@ -56,11 +59,13 @@ async def get_user_profile(user_id: str = Depends(require_auth)):
     response_data = map_user_profile_to_response(profile)
     return ApiResponse.success(data=response_data)
 
-@router.post("/assign-role", response_model=ApiResponse[RoleAssignmentResponse])
-@require_admin
+@router.post(
+    "/assign-role",
+    response_model=ApiResponse[RoleAssignmentResponse],
+    dependencies=[Depends(require_admin)],
+)
 async def assign_user_role(
     request: RoleAssignmentRequest,
-    admin_user_id: str = Depends(require_admin)
 ):
     """Assign a role to a user (admin only)."""
     user_service = UserService()
@@ -87,11 +92,13 @@ async def assign_user_role(
             detail=f"Error assigning role: {str(e)}"
         )
 
-@router.post("/remove-role", response_model=ApiResponse[RoleRemovalResponse])
-@require_admin
+@router.post(
+    "/remove-role",
+    response_model=ApiResponse[RoleRemovalResponse],
+    dependencies=[Depends(require_admin)],
+)
 async def remove_user_role(
     request: RoleRemovalRequest,
-    admin_user_id: str = Depends(require_admin)
 ):
     """Remove a role from a user (admin only)."""
     user_service = UserService()
@@ -118,9 +125,12 @@ async def remove_user_role(
             detail=f"Error removing role: {str(e)}"
         )
 
-@router.get("/users", response_model=ApiResponse[List[UserProfileResponse]])
-@require_admin
-async def list_users(admin_user_id: str = Depends(require_admin)):
+@router.get(
+    "/users",
+    response_model=ApiResponse[List[UserProfileResponse]],
+    dependencies=[Depends(require_admin)],
+)
+async def list_users():
     """List all users (admin only)."""
     user_service = UserService()
     users = await user_service.list_users()

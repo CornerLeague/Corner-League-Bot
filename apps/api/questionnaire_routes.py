@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete, text
 from typing import List, Optional
@@ -74,13 +75,14 @@ class TeamPreferenceRequest(BaseModel):
     interest_level: int
 
 @router.get("/status", response_model=ApiResponse[QuestionnaireStatusResponse])
-@require_auth
 async def get_questionnaire_status(
-    user_id: str = Depends(require_auth),
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
     """Get questionnaire completion status for the current user with optimized query."""
-    
+
+    user_id = credentials.user_id
+
     # Single optimized query using CTEs and joins
     query = text("""
         WITH sport_prefs AS (
@@ -186,15 +188,19 @@ async def get_teams_by_sport(
     response_data = [map_team_to_response(team) for team in teams]
     return ApiResponse.success(data=response_data)
 
-@router.post("/sports/preferences", response_model=ApiResponse[List[UserSportPreferenceResponse]])
-@require_auth
+@router.post(
+    "/sports/preferences",
+    response_model=ApiResponse[List[UserSportPreferenceResponse]],
+)
 async def save_sport_preferences(
     preferences: List[SportPreferenceRequest],
-    user_id: str = Depends(require_auth),
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
     """Save user sport preferences."""
-    
+
+    user_id = credentials.user_id
+
     # Validate interest levels
     for pref in preferences:
         if not 1 <= pref.interest_level <= 5:
@@ -240,15 +246,19 @@ async def save_sport_preferences(
     response_data = [map_user_sport_preference_to_response(pref) for pref in new_preferences]
     return ApiResponse.success(data=response_data)
 
-@router.post("/teams/preferences", response_model=ApiResponse[List[UserTeamPreferenceResponse]])
-@require_auth
+@router.post(
+    "/teams/preferences",
+    response_model=ApiResponse[List[UserTeamPreferenceResponse]],
+)
 async def save_team_preferences(
     preferences: List[TeamPreferenceRequest],
-    user_id: str = Depends(require_auth),
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
     """Save user team preferences."""
-    
+
+    user_id = credentials.user_id
+
     # Validate interest levels
     for pref in preferences:
         if not 1 <= pref.interest_level <= 5:
@@ -303,13 +313,14 @@ async def save_team_preferences(
     return ApiResponse.success(data=response_data)
 
 @router.get("/preferences", response_model=ApiResponse[dict])
-@require_auth
 async def get_user_preferences(
-    user_id: str = Depends(require_auth),
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
     """Get user's current sport and team preferences with optimized query."""
-    
+
+    user_id = credentials.user_id
+
     # Optimized query using CTEs and explicit joins
     query = text("""
         WITH sport_prefs AS (
