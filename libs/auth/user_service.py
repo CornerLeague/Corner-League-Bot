@@ -173,9 +173,38 @@ class ClerkAPIClient:
 
 class UserService:
     """Service for managing user profiles and preferences."""
-    
+
     def __init__(self):
         self.clerk_client = ClerkAPIClient()
+
+    def _clerk_user_to_profile(self, clerk_user: Dict[str, Any]) -> UserProfile:
+        """Convert Clerk user data to internal UserProfile model."""
+        try:
+            return UserProfile(
+                user_id=clerk_user.get("id"),
+                email=clerk_user.get("email_addresses", [{}])[0].get("email_address"),
+                first_name=clerk_user.get("first_name"),
+                last_name=clerk_user.get("last_name"),
+                username=clerk_user.get("username"),
+                profile_image_url=clerk_user.get("profile_image_url"),
+                created_at=datetime.fromisoformat(
+                    clerk_user.get("created_at", datetime.utcnow().isoformat())
+                ),
+                updated_at=datetime.fromisoformat(
+                    clerk_user.get("updated_at", datetime.utcnow().isoformat())
+                ),
+                last_sign_in_at=datetime.fromisoformat(
+                    clerk_user.get("last_sign_in_at")
+                ) if clerk_user.get("last_sign_in_at") else None,
+                roles=clerk_user.get("public_metadata", {}).get("roles", []),
+                is_verified=any(
+                    addr.get("verification", {}).get("status") == "verified"
+                    for addr in clerk_user.get("email_addresses", [])
+                ),
+            )
+        except Exception as e:
+            logger.error(f"Error mapping Clerk user to UserProfile: {e}")
+            raise
     
     async def get_or_create_user_profile(
         self,
@@ -198,34 +227,90 @@ class UserService:
             clerk_user = await self.clerk_client.get_user(user_id)
             if not clerk_user:
                 return None
-            
-            # Create profile from Clerk data
-            profile = UserProfile(
-                user_id=user_id,
-                email=clerk_user.get("email_addresses", [{}])[0].get("email_address"),
-                first_name=clerk_user.get("first_name"),
-                last_name=clerk_user.get("last_name"),
-                username=clerk_user.get("username"),
-                profile_image_url=clerk_user.get("profile_image_url"),
-                created_at=datetime.fromisoformat(
-                    clerk_user.get("created_at", datetime.utcnow().isoformat())
-                ),
-                updated_at=datetime.fromisoformat(
-                    clerk_user.get("updated_at", datetime.utcnow().isoformat())
-                ),
-                last_sign_in_at=datetime.fromisoformat(
-                    clerk_user.get("last_sign_in_at")
-                ) if clerk_user.get("last_sign_in_at") else None,
-                roles=clerk_user.get("public_metadata", {}).get("roles", []),
-                is_verified=any(
-                    addr.get("verification", {}).get("status") == "verified"
-                    for addr in clerk_user.get("email_addresses", [])
-                )
-            )
-            
+
+            try:
+                profile = self._clerk_user_to_profile(clerk_user)
+            except Exception:
+                return None
+
             return profile
-        
+
         return None
+
+    async def get_user_profile(
+        self,
+        user_id: str,
+        sync_with_clerk: bool = True
+    ) -> Optional[UserProfile]:
+        """Retrieve a user profile without creating it.
+
+        Args:
+            user_id: The Clerk user ID
+            sync_with_clerk: Whether to fetch from Clerk API
+
+        Returns:
+            UserProfile or None if not found
+        """
+        try:
+            if sync_with_clerk:
+                clerk_user = await self.clerk_client.get_user(user_id)
+                if not clerk_user:
+                    return None
+                return self._clerk_user_to_profile(clerk_user)
+        except Exception as e:
+            logger.error(f"Failed to get user profile: {e}")
+        return None
+
+    async def assign_role(self, user_id: str, role: str) -> bool:
+        """Assign a role to a user via Clerk metadata."""
+        try:
+            clerk_user = await self.clerk_client.get_user(user_id)
+            if not clerk_user:
+                return False
+            metadata = clerk_user.get("public_metadata", {})
+            roles = metadata.get("roles", [])
+            if role not in roles:
+                roles.append(role)
+            return await self.clerk_client.update_user_metadata(
+                user_id, public_metadata={"roles": roles}
+            )
+        except Exception as e:
+            logger.error(f"Failed to assign role '{role}' to user {user_id}: {e}")
+            return False
+
+    async def remove_role(self, user_id: str, role: str) -> bool:
+        """Remove a role from a user via Clerk metadata."""
+        try:
+            clerk_user = await self.clerk_client.get_user(user_id)
+            if not clerk_user:
+                return False
+            metadata = clerk_user.get("public_metadata", {})
+            roles = metadata.get("roles", [])
+            if role in roles:
+                roles.remove(role)
+            return await self.clerk_client.update_user_metadata(
+                user_id, public_metadata={"roles": roles}
+            )
+        except Exception as e:
+            logger.error(f"Failed to remove role '{role}' from user {user_id}: {e}")
+            return False
+
+    async def list_users(
+        self, limit: int = 100, offset: int = 0
+    ) -> List[UserProfile]:
+        """List users via Clerk."""
+        try:
+            users = await self.clerk_client.get_user_list(limit=limit, offset=offset)
+            profiles: List[UserProfile] = []
+            for user in users:
+                try:
+                    profiles.append(self._clerk_user_to_profile(user))
+                except Exception:
+                    continue
+            return profiles
+        except Exception as e:
+            logger.error(f"Failed to list users: {e}")
+            return []
     
     async def update_user_preferences(
         self,
