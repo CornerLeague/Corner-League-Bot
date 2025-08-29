@@ -5,3 +5,15 @@
 
 __version__ = "1.0.0"
 
+from .database import get_db
+from .questionnaire_models import Sport, Team, UserSportPreference, UserTeamPreference
+
+__all__ = [
+    "__version__",
+    "get_db",
+    "Sport",
+    "Team",
+    "UserSportPreference",
+    "UserTeamPreference",
+]
+
