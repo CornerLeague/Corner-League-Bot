@@ -156,9 +156,9 @@ class ProxyManager:
     def get_proxy_stats(self) -> Dict[str, Any]:
         """Get proxy usage statistics"""
         return {
-            "daily_usage_usd": self.daily_usage,
-            "daily_budget_usd": self.settings.evomi.daily_budget_usd,
-            "budget_remaining": self.settings.evomi.daily_budget_usd - self.daily_usage,
+            "daily_usage": self.daily_usage,
+            "daily_budget": self.settings.evomi.daily_budget,
+            "budget_remaining": self.settings.evomi.daily_budget - self.daily_usage,
             "proxy_stats": self.proxy_stats
         }
 
