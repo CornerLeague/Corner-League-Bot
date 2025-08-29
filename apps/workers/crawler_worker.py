@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-import aioredis
+from redis.asyncio import Redis
 from pydantic import BaseModel
 
 from libs.common.config import get_settings, Settings
@@ -67,7 +67,7 @@ class CrawlerWorker:
         
         # Components
         self.connection_pool: Optional[ConnectionPool] = None
-        self.redis_client: Optional[aioredis.Redis] = None
+        self.redis_client: Optional[Redis] = None
         self.crawler: Optional[WebCrawler] = None
         self.extractor: Optional[ContentExtractor] = None
         self.quality_gate: Optional[QualityGate] = None
@@ -105,7 +105,7 @@ class CrawlerWorker:
             logger.info("Database connection pool initialized")
             
             # Initialize Redis client
-            self.redis_client = await aioredis.create_redis_pool(
+            self.redis_client = await Redis.from_url(
                 self.settings.redis.url,
                 encoding="utf-8"
             )
@@ -683,7 +683,7 @@ class CrawlerWorker:
                 await self.connection_pool.close()
             
             if self.redis_client:
-                await self.redis_client.close()
+                await self.redis_client.aclose()
         
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
