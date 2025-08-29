@@ -1,0 +1,15 @@
+{
+  "name": "sports-media-platform",
+  "version": "1.0.0",
+  "description": "AI-powered sports media discovery and personalization platform",
+  "scripts": {
+    "generate-types": "openapi-typescript http://localhost:8000/openapi.json -o frontend/src/types/api.ts",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && python -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload",
+    "frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.2",
+    "concurrently": "^9.1.0"
+  }
+}
