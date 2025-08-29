@@ -6,7 +6,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, Generator, List, Optional
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -33,12 +33,46 @@ import json
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker, Session
 from sqlalchemy.sql import func
 
 logger = logging.getLogger(__name__)
 
 Base = declarative_base()
+
+# Import application settings
+from .config import get_settings
+
+settings = get_settings()
+
+# Synchronous engine and session factory for FastAPI routes and scripts
+sync_engine = create_engine(
+    settings.database.url,
+    echo=settings.database.echo,
+    pool_size=settings.database.pool_size,
+    max_overflow=settings.database.max_overflow,
+    pool_recycle=settings.database.pool_recycle,
+    pool_pre_ping=True,
+)
+
+SessionLocal = sessionmaker(bind=sync_engine, autoflush=False, autocommit=False)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Provide a synchronous database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Ensure questionnaire models are registered with Base metadata
+# by importing them after Base and Session setup.
+try:  # pragma: no cover - import for side effects
+    from . import questionnaire_models  # noqa: F401
+except Exception:  # pragma: no cover
+    pass
 
 
 # Database Models
