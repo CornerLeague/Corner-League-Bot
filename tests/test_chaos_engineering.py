@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-import aioredis
+from redis import asyncio as redis
 import asyncpg
 import pytest
 from pydantic import BaseModel
@@ -62,7 +62,7 @@ class ChaosEngineer:
 
         # System components for testing
         self.connection_pool: ConnectionPool | None = None
-        self.redis_client: aioredis.Redis | None = None
+        self.redis_client: redis.Redis | None = None
         self.search_engine: SearchEngine | None = None
 
         # Monitoring
@@ -230,7 +230,7 @@ class ChaosEngineer:
         self.connection_pool = ConnectionPool(self.settings.database.url)
         await self.connection_pool.initialize()
 
-        self.redis_client = aioredis.from_url(self.settings.redis.url)
+        self.redis_client = redis.from_url(self.settings.redis.url)
         await self.redis_client.ping()
 
         self.search_engine = SearchEngine(self.settings, self.connection_pool)
@@ -382,12 +382,12 @@ class ChaosEngineer:
 
             async def failing_get(*args, **kwargs):
                 if random.random() < scenario.failure_rate:
-                    raise aioredis.ConnectionError("Redis connection failed")
+                    raise redis.ConnectionError("Redis connection failed")
                 return await original_get(*args, **kwargs)
 
             async def failing_set(*args, **kwargs):
                 if random.random() < scenario.failure_rate:
-                    raise aioredis.ConnectionError("Redis connection failed")
+                    raise redis.ConnectionError("Redis connection failed")
                 return await original_set(*args, **kwargs)
 
             self.redis_client.get = failing_get

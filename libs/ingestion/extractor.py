@@ -32,6 +32,17 @@ __all__ = [
 ]
 
 
+__all__ = [
+    "URLCanonicalizer",
+    "CanonicalURLExtractor",
+    "ContentHasher",
+    "NearDuplicateDetector",
+    "DuplicateDetector",
+    "ContentExtractor",
+    "ExtractionPipeline",
+]
+
+
 class URLCanonicalizer:
     """Canonicalizes URLs for deduplication"""
 
@@ -138,10 +149,6 @@ class URLCanonicalizer:
         return None
 
 
-class CanonicalURLExtractor(URLCanonicalizer):
-    """Backward-compatible alias for URLCanonicalizer."""
-
-    pass
 
 
 class ContentHasher:
@@ -295,8 +302,7 @@ class NearDuplicateDetector:
                     pass  # Ignore errors during cleanup
 
 
-class DuplicateDetector(NearDuplicateDetector):
-    """Backward-compatible alias for :class:`NearDuplicateDetector`.
+
 
     The original implementation accepted a Redis client as the first
     positional argument. To maintain drop-in compatibility while using

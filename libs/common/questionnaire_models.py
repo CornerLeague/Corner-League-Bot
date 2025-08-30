@@ -12,7 +12,29 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, T
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
+from pydantic import BaseModel
+
 from .database import Base
+
+
+class SportRankingRequest(BaseModel):
+    """Request model for updating sport rankings."""
+
+    sport_rankings: list[str]
+
+
+class FavoriteTeamsRequest(BaseModel):
+    """Request model for saving favorite teams."""
+
+    team_selections: list[dict]
+
+
+class UserQuestionnaireStatus(BaseModel):
+    """Simple questionnaire status representation used in tests."""
+
+    user_id: str
+    is_completed: bool
+    current_step: int
 
 
 class Sport(Base):
@@ -88,5 +110,8 @@ __all__ = [
     "Team",
     "UserSportPreference",
     "UserTeamPreference",
+    "SportRankingRequest",
+    "FavoriteTeamsRequest",
+    "UserQuestionnaireStatus",
 ]
 
