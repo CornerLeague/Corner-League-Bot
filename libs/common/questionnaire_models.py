@@ -24,10 +24,18 @@ class SportRankingRequest(BaseModel):
     sport_rankings: list[str]
 
 
+
+class TeamPreferenceRequest(BaseModel):
+    """Request model for a single team preference."""
+
+    team_id: str
+    interest_level: int
+
+
 class FavoriteTeamsRequest(BaseModel):
     """Request model for saving favorite teams."""
 
-    team_selections: list[dict]
+    team_selections: list[TeamPreferenceRequest]
 
 
 class UserQuestionnaireStatus(BaseModel):
