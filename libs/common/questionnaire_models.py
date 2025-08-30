@@ -61,6 +61,7 @@ class UserSportPreference(Base):
     user_id = Column(String(255), nullable=False, index=True)
     sport_id = Column(Integer, ForeignKey("sports.id"), nullable=False, index=True)
     interest_level = Column(Integer, nullable=False)
+    preference_order = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
     # Relationships

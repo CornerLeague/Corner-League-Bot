@@ -5,7 +5,7 @@ including environment variable validation and JWKS URL handling.
 """
 
 import os
-from typing import Optional
+from typing import Optional, List
 from pydantic import validator
 from pydantic_settings import BaseSettings
 import logging
@@ -29,7 +29,7 @@ class ClerkConfig(BaseSettings):
     clerk_jwks_url: Optional[str] = None
     
     # JWT Configuration
-    jwt_algorithm: str = "RS256"
+    jwt_algorithms: List[str] = ["RS256", "ES256", "HS256"]
     jwt_audience: Optional[str] = None
     
     # Cache settings for JWKS

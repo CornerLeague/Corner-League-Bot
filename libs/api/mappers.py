@@ -83,3 +83,14 @@ def map_content_item_to_response(item) -> dict:
         "content_type": item.content_type,
         "tags": item.tags
     }
+
+def map_user_stats_to_response(stats) -> dict:
+    """Convert user stats to API response format."""
+    return {
+        "articles_read": getattr(stats, 'articles_read', 0),
+        "articles_saved": getattr(stats, 'articles_saved', 0),
+        "articles_shared": getattr(stats, 'articles_shared', 0),
+        "total_reading_time": getattr(stats, 'total_reading_time', 0),
+        "favorite_topics": getattr(stats, 'favorite_topics', []),
+        "activity_streak": getattr(stats, 'activity_streak', 0)
+    }

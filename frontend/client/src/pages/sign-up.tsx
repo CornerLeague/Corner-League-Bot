@@ -9,7 +9,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (isSignedIn) {
-      setLocation("/");
+      setLocation("/questionnaire");
     }
   }, [isSignedIn, setLocation]);
 
@@ -44,7 +44,7 @@ export default function SignUpPage() {
                 identityPreviewEditButton: "text-emerald-600 hover:text-emerald-500"
               }
             }}
-            redirectUrl="/"
+            redirectUrl="/questionnaire"
           />
         </div>
         

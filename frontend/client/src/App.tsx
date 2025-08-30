@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { clerkConfig, clerkAppearance } from "./lib/clerk";
 import Home from "@/pages/home";
 import Profile from "@/pages/profile";
+import QuestionnairePage from "@/pages/questionnaire";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import NotFound from "@/pages/not-found";
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/profile" component={Profile} />
+      <Route path="/questionnaire" component={QuestionnairePage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route component={NotFound} />
@@ -26,13 +28,13 @@ function Router() {
 function App() {
   return (
     <ClerkProvider
-        publishableKey="pk_test_cG9saXNoZWQtZWdyZXQtOTMuY2xlcmsuYWNjb3VudHMuZGV2JA"
+        publishableKey={clerkConfig.publishableKey}
         appearance={clerkAppearance}
-        signInUrl="/sign-in"
-        signUpUrl="/sign-up"
-        afterSignInUrl="/"
-        afterSignUpUrl="/"
-        afterSignOutUrl="/"
+        signInUrl={clerkConfig.signInUrl}
+        signUpUrl={clerkConfig.signUpUrl}
+        afterSignInUrl={clerkConfig.afterSignInUrl}
+        afterSignUpUrl={clerkConfig.afterSignUpUrl}
+        afterSignOutUrl={clerkConfig.afterSignOutUrl}
       >
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>

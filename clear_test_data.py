@@ -18,7 +18,7 @@ async def clear_test_data():
     db_manager = DatabaseManager(settings.database.url)
     
     try:
-        async for session in db_manager.get_session():
+        async with await db_manager.transaction() as session:
             logger.info("Clearing test data from database...")
             
             # Get current counts

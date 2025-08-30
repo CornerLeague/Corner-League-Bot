@@ -5,10 +5,11 @@
  * certain routes. Redirects unauthenticated users to sign-in.
  */
 
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { ReactNode } from 'react';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { hasRole } from '@/lib/clerk';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -23,10 +24,11 @@ export function ProtectedRoute({
   requireRole,
   redirectTo = '/sign-in'
 }: ProtectedRouteProps) {
-  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
 
   // Show loading state while Clerk is initializing
-  if (!isLoaded) {
+  if (!isLoaded || !userLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -62,10 +64,20 @@ export function ProtectedRoute({
     );
   }
 
-  // TODO: Add role-based access control when user roles are implemented
-  // if (requireRole && !userHasRole(requireRole)) {
-  //   return <UnauthorizedAccess />;
-  // }
+  // Check role-based access control
+  if (requireRole && !hasRole(user, requireRole)) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md mx-auto p-6">
+          <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-2xl font-semibold mb-2">Unauthorized</h2>
+          <p className="text-gray-600">
+            You need the <span className="font-semibold">{requireRole}</span> role to access this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Render protected content for authenticated users
   return <>{children}</>;

@@ -6,7 +6,8 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, Generator, List, Optional
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -33,46 +34,12 @@ import json
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker, Session
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 logger = logging.getLogger(__name__)
 
 Base = declarative_base()
-
-# Import application settings
-from .config import get_settings
-
-settings = get_settings()
-
-# Synchronous engine and session factory for FastAPI routes and scripts
-sync_engine = create_engine(
-    settings.database.url,
-    echo=settings.database.echo,
-    pool_size=settings.database.pool_size,
-    max_overflow=settings.database.max_overflow,
-    pool_recycle=settings.database.pool_recycle,
-    pool_pre_ping=True,
-)
-
-SessionLocal = sessionmaker(bind=sync_engine, autoflush=False, autocommit=False)
-
-
-def get_db() -> Generator[Session, None, None]:
-    """Provide a synchronous database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# Ensure questionnaire models are registered with Base metadata
-# by importing them after Base and Session setup.
-try:  # pragma: no cover - import for side effects
-    from . import questionnaire_models  # noqa: F401
-except Exception:  # pragma: no cover
-    pass
 
 
 # Database Models
@@ -541,6 +508,31 @@ class DatabaseManager:
             finally:
                 await session.close()
 
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator[AsyncSession]:
+        """Async context manager for read-only database sessions"""
+        async with self.session_factory() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[AsyncSession]:
+        """Async context manager for transactional database operations"""
+        async with self.session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
     async def create_tables(self) -> None:
         """Create all database tables"""
         async with self.engine.begin() as conn:
@@ -675,6 +667,27 @@ def migrate(database_url: str):
     # This would integrate with Alembic
     click.echo("Running migrations...")
     # TODO: Implement Alembic integration
+
+
+# Global database manager instance
+_db_manager: Optional[DatabaseManager] = None
+
+
+def get_database_manager() -> DatabaseManager:
+    """Get the global database manager instance."""
+    global _db_manager
+    if _db_manager is None:
+        from .config import get_settings
+        settings = get_settings()
+        _db_manager = DatabaseManager(settings.database.url)
+    return _db_manager
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency for database sessions."""
+    db_manager = get_database_manager()
+    async with db_manager.session() as session:
+        yield session
 
 
 def migrate_cli():

@@ -10,7 +10,7 @@ from functools import wraps
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
-from .middleware import get_clerk_bearer
+from .middleware import get_clerk_bearer, EnhancedCredentials
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +37,15 @@ class AuthenticationError(HTTPException):
 
 
 def require_auth(
-    credentials: HTTPAuthorizationCredentials = Depends(get_clerk_bearer())
-) -> HTTPAuthorizationCredentials:
+    credentials: EnhancedCredentials = Depends(get_clerk_bearer())
+) -> EnhancedCredentials:
     """Dependency that requires valid authentication.
     
     Args:
-        credentials: The HTTP authorization credentials from Clerk
+        credentials: The enhanced credentials from Clerk with decoded JWT
         
     Returns:
-        HTTPAuthorizationCredentials: The validated credentials with user info
+        EnhancedCredentials: The validated credentials with user info
         
     Raises:
         AuthenticationError: If authentication is missing or invalid
@@ -79,8 +79,8 @@ def require_role(
             return {"message": "Admin access granted"}
     """
     def role_dependency(
-        credentials: HTTPAuthorizationCredentials = Depends(require_auth)
-    ) -> HTTPAuthorizationCredentials:
+        credentials: EnhancedCredentials = Depends(require_auth)
+    ) -> EnhancedCredentials:
         # Skip validation if credentials is None (during module import)
         if credentials is None:
             return credentials
@@ -115,15 +115,15 @@ def require_role(
 
 
 def require_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(require_role(["admin"]))
-) -> HTTPAuthorizationCredentials:
+    credentials: EnhancedCredentials = Depends(require_role(["admin"]))
+) -> EnhancedCredentials:
     """Dependency that requires admin role.
     
     Args:
-        credentials: The HTTP authorization credentials
+        credentials: The enhanced credentials
         
     Returns:
-        HTTPAuthorizationCredentials: The validated admin credentials
+        EnhancedCredentials: The validated admin credentials
         
     Raises:
         PermissionError: If user is not an admin
@@ -132,15 +132,15 @@ def require_admin(
 
 
 def require_moderator(
-    credentials: HTTPAuthorizationCredentials = Depends(require_role(["admin", "moderator"]))
-) -> HTTPAuthorizationCredentials:
+    credentials: EnhancedCredentials = Depends(require_role(["admin", "moderator"]))
+) -> EnhancedCredentials:
     """Dependency that requires admin or moderator role.
     
     Args:
-        credentials: The HTTP authorization credentials
+        credentials: The enhanced credentials
         
     Returns:
-        HTTPAuthorizationCredentials: The validated credentials
+        EnhancedCredentials: The validated credentials
         
     Raises:
         PermissionError: If user is not an admin or moderator
@@ -233,8 +233,8 @@ def require_ownership_or_role(
         allowed_roles = ["admin", "moderator"]
     
     def ownership_dependency(
-        credentials: HTTPAuthorizationCredentials = Depends(require_auth)
-    ) -> HTTPAuthorizationCredentials:
+        credentials: EnhancedCredentials = Depends(require_auth)
+    ) -> EnhancedCredentials:
         user_id = getattr(credentials, 'user_id', '')
         user_roles = getattr(credentials, 'user_roles', [])
         
@@ -279,8 +279,8 @@ def rate_limit_by_user(
     request_counts = defaultdict(list)
     
     def rate_limit_dependency(
-        credentials: HTTPAuthorizationCredentials = Depends(require_auth)
-    ) -> HTTPAuthorizationCredentials:
+        credentials: EnhancedCredentials = Depends(require_auth)
+    ) -> EnhancedCredentials:
         user_id = getattr(credentials, 'user_id', '')
         now = datetime.utcnow()
         window_start = now - timedelta(seconds=window_seconds)
