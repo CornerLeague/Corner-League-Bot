@@ -53,7 +53,7 @@ class TestQuestionnaireRoutes:
 
     async def test_get_available_sports_success(self, mock_db_manager, sample_sports):
         """Test successful retrieval of available sports."""
-        db_manager, mock_session = mock_db_manager
+        _, mock_session = mock_db_manager
 
         # Mock the SQLAlchemy result
         mock_result = MagicMock()
@@ -61,12 +61,12 @@ class TestQuestionnaireRoutes:
         mock_session.execute.return_value = mock_result
 
         # Execute
-        result = await get_available_sports(db_manager)
+        result = await get_available_sports(mock_session)
 
         # Assert
-        assert len(result.sports) == 2
-        assert result.total_count == 2
-        assert result.sports[0].name == "Basketball"
+        assert result.success is True
+        assert len(result.data) == 2
+        assert result.data[0]["name"] == "Basketball"
         mock_session.execute.assert_called_once()
 
     async def test_get_available_sports_error(self, mock_db_manager):
