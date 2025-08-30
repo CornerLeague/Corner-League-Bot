@@ -361,6 +361,20 @@ async def save_sport_rankings(
     # Return the updated rankings
     return ApiResponse(success=True, data=sport_rankings)
 
+
+@router.put(
+    "/sports/ranking",
+    response_model=ApiResponse[list[str]],
+)
+async def update_sport_ranking(
+    request: SportRankingRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Alias for ``save_sport_rankings`` using HTTP PUT."""
+
+    return await save_sport_rankings(request, credentials, db)
+
 @router.post(
     "/teams/preferences",
     response_model=ApiResponse[list[UserTeamPreferenceResponse]],
