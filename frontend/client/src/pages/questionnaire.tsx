@@ -176,8 +176,11 @@ export default function QuestionnairePage() {
     try {
       setSubmitting(true);
       setError(null);
-
-      await saveTeamPreferences.mutateAsync({ team_selections: selectedTeams });
+      const teamPreferences = selectedTeams.map(team => ({
+        team_id: team.team_id,
+        interest_level: 3,
+      }));
+      await saveTeamPreferences.mutateAsync(teamPreferences);
       setCurrentStep('completed');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save team preferences';

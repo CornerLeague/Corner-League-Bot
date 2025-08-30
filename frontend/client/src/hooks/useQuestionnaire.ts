@@ -65,11 +65,9 @@ interface SportRankingRequest {
   sport_rankings: string[];
 }
 
-interface FavoriteTeamsRequest {
-  team_selections: Array<{
-    team_id: string;
-    sport_id: string;
-  }>;
+interface TeamPreferenceRequest {
+  team_id: string;
+  interest_level: number;
 }
 
 // Use relative API path - Vite proxy will redirect to backend
@@ -336,7 +334,7 @@ export function useSaveTeamPreferences() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: FavoriteTeamsRequest) => {
+    mutationFn: async (data: TeamPreferenceRequest[]) => {
       const token = await getToken();
       const response = await fetch(`${API_BASE}/teams/preferences`, {
         method: 'POST',

@@ -14,10 +14,10 @@ from apps.api.questionnaire_routes import (
     update_sport_ranking,
 )
 from libs.common.questionnaire_models import (
-    FavoriteTeamsRequest,
     Sport,
     SportRankingRequest,
     Team,
+    TeamPreferenceRequest,
     UserQuestionnaireStatus,
     UserSportPreference,
     UserTeamPreference,
@@ -151,27 +151,23 @@ class TestQuestionnaireRoutes:
         """Test successful team preferences save."""
         db_manager, mock_session = mock_db_manager
 
-        # Mock request and user
-        mock_request = MagicMock(spec=Request)
-        mock_request.state.user = {"sub": "user123"}
-
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
+        mock_credentials.user_id = "user123"
 
-        request_data = FavoriteTeamsRequest(team_selections=[
-            {"sport_id": "1", "team_id": "1"},
-            {"sport_id": "1", "team_id": "2"}
-        ])
+        request_data = [
+            TeamPreferenceRequest(team_id="1", interest_level=3),
+            TeamPreferenceRequest(team_id="2", interest_level=3)
+        ]
 
         # Mock database operations
         mock_session.execute.return_value = MagicMock()
         mock_session.commit.return_value = None
 
         # Execute
-        with patch("apps.api.questionnaire_routes.get_current_user_id", return_value="user123"):
-            result = await save_team_preferences(mock_request, request_data, db_manager, mock_credentials)
+        result = await save_team_preferences(request_data, mock_credentials, mock_session)
 
         # Assert
-        assert result["message"] == "Team preferences saved successfully"
+        assert result.success is True
         assert mock_session.commit.called
 
     async def test_get_user_preferences_success(self, mock_db_manager):
