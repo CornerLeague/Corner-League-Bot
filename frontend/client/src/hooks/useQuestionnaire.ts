@@ -386,12 +386,12 @@ export function useTeamsForSports(sportIds: string[]) {
   
   // Convert sportIds to strings for API calls
   const validSportIds = (sportIds || [])
-    .filter(sportId => 
-      sportId && 
-      typeof sportId === 'number' && 
-      !isNaN(sportId)
+    .filter((sportId) =>
+      typeof sportId === 'string'
+        ? sportId.trim() !== ''
+        : sportId != null && !Number.isNaN(sportId)
     )
-    .map(sportId => sportId.toString());
+    .map((sportId) => sportId.toString());
   
   return useQuery({
     queryKey: ['teams-for-sports', validSportIds],
