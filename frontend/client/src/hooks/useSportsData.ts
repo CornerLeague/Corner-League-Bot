@@ -8,14 +8,14 @@
 
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { useState, useCallback, useMemo } from 'react';
-import { 
-  api, 
-  queryKeys, 
+import {
+  api,
+  queryKeys,
   cacheUtils,
   errorUtils,
   mockData,
-  type ContentItem, 
-  type SearchRequest, 
+  type ContentItem,
+  type SearchRequest,
   type SearchResponse,
   type TrendingTerm,
   type SummaryRequest,
@@ -68,11 +68,11 @@ function usePlatformStats() {
 
 // Content search hook with advanced options
 function useSearch(request: SearchRequest, options: UseSearchOptions = {}) {
-  const { 
-    enabled = true, 
-    staleTime = STALE_TIME, 
+  const {
+    enabled = true,
+    staleTime = STALE_TIME,
     refetchInterval,
-    fallbackToMock = true 
+    fallbackToMock = true
   } = options;
 
   return useQuery({
@@ -309,12 +309,12 @@ function useRealTimeUpdates(enabled: boolean = true) {
     queryFn: async () => {
       // Check for new content and invalidate relevant queries
       const stats = await api.getStats();
-      
+
       // If there's new content, invalidate searches
       if (stats.content.articles_1h > 0) {
         cacheUtils.invalidateSearches();
       }
-      
+
       return stats;
     },
     enabled,
@@ -415,7 +415,7 @@ function useErrorHandler() {
     const errorMessage = errorUtils.getErrorMessage(error);
     const errorObj = new Error(errorMessage);
     setError(errorObj);
-    
+
     // Log error for monitoring
     console.error('Application error:', error);
   }, []);
@@ -475,14 +475,14 @@ export {
   useTrending,
   useSummarization,
   useUserPreferences,
-  
+
   // Content type hooks
   useLatestNews,
   useBreakingNews,
   useGameRecaps,
   useTradingNews,
   useAnalysis,
-  
+
   // Advanced hooks
   useInfiniteSearch,
   useRealTimeUpdates,
@@ -491,4 +491,3 @@ export {
   useErrorHandler,
   usePerformanceMonitoring,
 };
-

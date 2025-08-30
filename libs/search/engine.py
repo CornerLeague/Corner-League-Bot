@@ -136,7 +136,7 @@ class PostgreSQLSearchEngine:
 
         # Base query with joins
         base_query = """
-        SELECT 
+        SELECT
             ci.id,
             ci.title,
             ci.byline,
@@ -156,7 +156,7 @@ class PostgreSQLSearchEngine:
         if search_query.query:
             # Simple relevance scoring based on title and summary matches
             base_query += """
-            , (CASE 
+            , (CASE
                 WHEN ci.title LIKE '%' || :query || '%' THEN 3.0
                 WHEN ci.summary LIKE '%' || :query || '%' THEN 2.0
                 ELSE 1.0
@@ -875,4 +875,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -149,13 +149,13 @@ class ClerkTokenValidator:
 
     async def validate_token(self, token: str) -> dict[str, Any]:
         """Validate a Clerk JWT token and return the decoded payload.
-        
+
         Args:
             token: The JWT token to validate
-            
+
         Returns:
             Dict containing the decoded token payload
-            
+
         Raises:
             HTTPException: If token is invalid or expired
         """
@@ -236,7 +236,7 @@ class ClerkTokenValidator:
 
 class ClerkAuthMiddleware(BaseHTTPMiddleware):
     """Middleware to handle Clerk authentication for all requests.
-    
+
     This middleware automatically validates JWT tokens and injects user context
     into the request state for protected routes.
     """

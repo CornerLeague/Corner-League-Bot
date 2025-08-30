@@ -4,4 +4,3 @@
 """Content quality assessment and source reputation management."""
 
 __version__ = "1.0.0"
-

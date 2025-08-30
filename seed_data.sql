@@ -10,7 +10,7 @@ INSERT INTO sources (id, name, domain, base_url, source_type, rss_url, is_active
 
 -- Insert test content items
 INSERT INTO content_items (id, title, summary, canonical_url, original_url, source_id, sports_keywords, content_type, published_at, created_at, updated_at, quality_score, content_hash) VALUES
-('660e8400-e29b-41d4-a716-446655440001', 
+('660e8400-e29b-41d4-a716-446655440001',
  'Dodgers Win World Series in Dramatic Fashion',
  'The Los Angeles Dodgers defeated the Yankees 4-1 in the World Series, with Mookie Betts leading the charge with clutch hitting throughout the series.',
  'https://example.com/dodgers-world-series-win',

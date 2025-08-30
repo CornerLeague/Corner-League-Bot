@@ -702,7 +702,7 @@ server {
 
     ssl_certificate /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/api.yourdomain.com/privkey.pem;
-    
+
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
@@ -1175,9 +1175,9 @@ aws elasticache increase-replica-count \
 SELECT count(*) FROM pg_stat_activity WHERE state = 'active';
 
 -- Kill long-running queries
-SELECT pg_terminate_backend(pid) 
-FROM pg_stat_activity 
-WHERE state = 'active' 
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE state = 'active'
 AND query_start < NOW() - INTERVAL '5 minutes';
 
 -- Optimize connection pooling
@@ -1224,9 +1224,9 @@ curl -s http://api.yourdomain.com/metrics | grep http_request_duration
 curl -w "@curl-format.txt" -o /dev/null -s "http://api.yourdomain.com/api/v1/search?q=test"
 
 # Check database query performance
-SELECT query, mean_time, calls 
-FROM pg_stat_statements 
-ORDER BY mean_time DESC 
+SELECT query, mean_time, calls
+FROM pg_stat_statements
+ORDER BY mean_time DESC
 LIMIT 10;
 ```
 
@@ -1234,13 +1234,13 @@ LIMIT 10;
 ```sql
 -- Check slow queries
 SELECT query, mean_time, calls, total_time
-FROM pg_stat_statements 
-WHERE mean_time > 1000 
+FROM pg_stat_statements
+WHERE mean_time > 1000
 ORDER BY mean_time DESC;
 
 -- Check index usage
-SELECT schemaname, tablename, attname, n_distinct, correlation 
-FROM pg_stats 
+SELECT schemaname, tablename, attname, n_distinct, correlation
+FROM pg_stats
 WHERE tablename = 'content_items';
 
 -- Analyze table statistics
@@ -1342,4 +1342,3 @@ curl -X GET "elasticsearch:9200/sports-media-logs-*/_search" -H 'Content-Type: a
 ---
 
 This production deployment guide provides comprehensive instructions for deploying the Sports Media Platform with enterprise-grade reliability, security, and performance. Follow the guidelines appropriate for your infrastructure and scale requirements.
-

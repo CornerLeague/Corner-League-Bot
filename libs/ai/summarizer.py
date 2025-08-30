@@ -157,20 +157,20 @@ class SportsSummarizer:
 
         # Sports-specific prompts
         self.summary_prompts = {
-            "brief": """You are a sports journalist creating concise summaries. 
-            Summarize the key points from the provided sports articles in 2-3 sentences. 
+            "brief": """You are a sports journalist creating concise summaries.
+            Summarize the key points from the provided sports articles in 2-3 sentences.
             Focus on the most important developments, scores, and player performances.""",
 
-            "detailed": """You are a sports analyst providing comprehensive analysis. 
-            Create a detailed summary covering all major points from the articles. 
+            "detailed": """You are a sports analyst providing comprehensive analysis.
+            Create a detailed summary covering all major points from the articles.
             Include context, implications, and relevant background information.""",
 
-            "analysis": """You are a sports expert providing in-depth analysis. 
-            Analyze the provided content for trends, implications, and strategic insights. 
+            "analysis": """You are a sports expert providing in-depth analysis.
+            Analyze the provided content for trends, implications, and strategic insights.
             Connect events to broader narratives in the sport.""",
 
-            "breaking": """You are reporting breaking sports news. 
-            Summarize the most urgent and newsworthy information first. 
+            "breaking": """You are reporting breaking sports news.
+            Summarize the most urgent and newsworthy information first.
             Emphasize what just happened and why it matters."""
         }
 
@@ -756,4 +756,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

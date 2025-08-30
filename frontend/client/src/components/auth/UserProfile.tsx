@@ -1,6 +1,6 @@
 /**
  * UserProfile Component
- * 
+ *
  * A comprehensive user profile component that displays user information,
  * preferences, and provides access to account management features.
  */
@@ -9,11 +9,11 @@ import { useUser, useAuth } from '@clerk/clerk-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { 
-  User, 
-  Settings, 
-  Bell, 
-  Shield, 
+import {
+  User,
+  Settings,
+  Bell,
+  Shield,
   Activity,
   Calendar,
   Mail,
@@ -59,7 +59,7 @@ export function UserProfile() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPreferences(data);
@@ -110,9 +110,9 @@ export function UserProfile() {
           <div className="flex items-center space-x-4">
             <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
               {user.imageUrl ? (
-                <img 
-                  src={user.imageUrl} 
-                  alt={user.fullName || 'User'} 
+                <img
+                  src={user.imageUrl}
+                  alt={user.fullName || 'User'}
                   className="h-16 w-16 rounded-full object-cover"
                 />
               ) : (

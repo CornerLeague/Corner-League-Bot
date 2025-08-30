@@ -421,4 +421,3 @@ FEATURE_FLAGS = {
 def create_feature_flags(redis_client=None) -> FeatureFlags:
     """Create feature flags instance"""
     return FeatureFlags(redis_client)
-

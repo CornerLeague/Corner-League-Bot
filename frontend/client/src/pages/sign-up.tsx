@@ -24,9 +24,9 @@ export default function SignUpPage() {
             Join the ultimate sports media platform
           </p>
         </div>
-        
+
         <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
-          <SignUp 
+          <SignUp
             appearance={{
               elements: {
                 rootBox: "mx-auto",
@@ -47,12 +47,12 @@ export default function SignUpPage() {
             redirectUrl="/questionnaire"
           />
         </div>
-        
+
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{" "}
-            <a 
-              href="/sign-in" 
+            <a
+              href="/sign-in"
               className="font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
             >
               Sign in here

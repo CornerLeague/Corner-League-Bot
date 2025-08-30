@@ -25,4 +25,3 @@ __all__ = [
     "URLCanonicalizer",
     "__version__",
 ]
-

@@ -4,4 +4,3 @@
 """Search and ranking functionality for sports content."""
 
 __version__ = "1.0.0"
-

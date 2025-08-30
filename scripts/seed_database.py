@@ -152,7 +152,7 @@ async def seed_sources(connection_pool: ConnectionPool) -> list[str]:
                 created_at, updated_at
             ) VALUES (
                 gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), NOW()
-            ) 
+            )
             ON CONFLICT (domain) DO UPDATE SET
                 name = EXCLUDED.name,
                 is_active = EXCLUDED.is_active,
@@ -478,4 +478,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

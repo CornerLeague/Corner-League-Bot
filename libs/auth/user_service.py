@@ -80,10 +80,10 @@ class ClerkAPIClient:
 
     async def get_user(self, user_id: str) -> dict[str, Any] | None:
         """Get user information from Clerk.
-        
+
         Args:
             user_id: The Clerk user ID
-            
+
         Returns:
             Dict containing user information or None if not found
         """
@@ -107,12 +107,12 @@ class ClerkAPIClient:
         private_metadata: dict[str, Any] | None = None
     ) -> bool:
         """Update user metadata in Clerk.
-        
+
         Args:
             user_id: The Clerk user ID
             public_metadata: Public metadata to update
             private_metadata: Private metadata to update
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -141,12 +141,12 @@ class ClerkAPIClient:
         email_address: str | None = None
     ) -> list[dict[str, Any]]:
         """Get a list of users from Clerk.
-        
+
         Args:
             limit: Maximum number of users to return
             offset: Number of users to skip
             email_address: Filter by email address
-            
+
         Returns:
             List of user dictionaries
         """
@@ -209,11 +209,11 @@ class UserService:
         sync_with_clerk: bool = True
     ) -> UserProfile | None:
         """Get or create a user profile.
-        
+
         Args:
             user_id: The Clerk user ID
             sync_with_clerk: Whether to sync with Clerk API
-            
+
         Returns:
             UserProfile or None if user doesn't exist
         """
@@ -315,11 +315,11 @@ class UserService:
         preferences: UserPreferences
     ) -> bool:
         """Update user preferences.
-        
+
         Args:
             user_id: The user ID
             preferences: The preferences to update
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -342,10 +342,10 @@ class UserService:
 
     async def get_user_preferences(self, user_id: str) -> UserPreferences:
         """Get user preferences.
-        
+
         Args:
             user_id: The user ID
-            
+
         Returns:
             UserPreferences: The user's preferences
         """
@@ -369,14 +369,14 @@ class UserService:
         metadata: dict[str, Any] | None = None
     ) -> bool:
         """Track user activity.
-        
+
         Args:
             user_id: The user ID
             action: The action performed
             resource_type: Type of resource
             resource_id: ID of the resource
             metadata: Additional metadata
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -407,12 +407,12 @@ class UserService:
         action_filter: str | None = None
     ) -> list[UserActivity]:
         """Get user activity history.
-        
+
         Args:
             user_id: The user ID
             limit: Maximum number of activities to return
             action_filter: Filter by specific action
-            
+
         Returns:
             List of UserActivity objects
         """
@@ -428,10 +428,10 @@ class UserService:
 
     async def delete_user_data(self, user_id: str) -> bool:
         """Delete all user data (GDPR compliance).
-        
+
         Args:
             user_id: The user ID
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -448,10 +448,10 @@ class UserService:
 
     async def get_user_stats(self, user_id: str) -> dict[str, Any]:
         """Get user statistics.
-        
+
         Args:
             user_id: The user ID
-            
+
         Returns:
             Dict containing user statistics
         """

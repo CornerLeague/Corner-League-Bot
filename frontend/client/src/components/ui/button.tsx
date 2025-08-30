@@ -1,6 +1,6 @@
 /**
  * Button Component
- * 
+ *
  * A reusable button component with multiple variants and sizes,
  * built with Tailwind CSS and class-variance-authority for type-safe styling.
  */

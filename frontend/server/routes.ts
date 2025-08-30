@@ -16,9 +16,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const backendUrl = `http://localhost:8000${req.originalUrl}`;
       console.log(`[PROXY] ${req.method} ${req.originalUrl} -> ${backendUrl}`);
-      
+
       const headers: Record<string, string> = {};
-        
+
         // Copy relevant headers from the request, excluding problematic ones
         const excludeHeaders = ['content-length', 'host', 'connection', 'keep-alive'];
         Object.entries(req.headers).forEach(([key, value]) => {
@@ -26,25 +26,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             headers[key] = value;
           }
         });
-        
+
         console.log(`[PROXY] Request headers:`, headers);
         console.log(`[PROXY] Request body:`, req.body);
-       
+
        // Prepare the body - send as parsed JSON object
         let body: any;
         if (req.method !== 'GET' && req.body) {
-          // req.body is already parsed by Express, send it as-is
-          body = req.body;
+          // req.body is already parsed by Express, send it as JSON string
+          body = JSON.stringify(req.body);
           headers['Content-Type'] = 'application/json';
           console.log(`[PROXY] Request body:`, req.body);
         }
-       
+
        const response = await fetch(backendUrl, {
            method: req.method,
            headers,
-           body: body ? JSON.stringify(body) : undefined,
+           body: body,
          });
-      
+
       // Handle both JSON and non-JSON responses
       let data;
       const contentType = response.headers.get('content-type');
@@ -53,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         data = { message: await response.text() };
       }
-      
+
       console.log(`[PROXY] Response status: ${response.status}, data:`, data);
       res.status(response.status).json(data);
     } catch (error) {

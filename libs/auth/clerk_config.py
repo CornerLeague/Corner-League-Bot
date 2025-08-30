@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ClerkConfig(BaseSettings):
     """Configuration class for Clerk authentication settings.
-    
+
     This class manages all Clerk-related configuration including API keys,
     JWKS URLs, and validation settings.
     """
@@ -99,10 +99,10 @@ class ClerkConfig(BaseSettings):
 
     def get_jwks_url(self) -> str:
         """Get the JWKS URL for token validation.
-        
+
         Returns:
             str: The JWKS URL for fetching public keys
-            
+
         Raises:
             ValueError: If JWKS URL is not configured
         """
@@ -114,10 +114,10 @@ class ClerkConfig(BaseSettings):
 
     def get_issuer(self) -> str:
         """Get the issuer URL for token validation.
-        
+
         Returns:
             str: The issuer URL
-            
+
         Raises:
             ValueError: If issuer is not configured
         """
@@ -140,10 +140,10 @@ class ClerkConfig(BaseSettings):
 
     def validate_configuration(self) -> bool:
         """Validate the complete configuration.
-        
+
         Returns:
             bool: True if configuration is valid
-            
+
         Raises:
             ValueError: If configuration is invalid
         """
@@ -172,10 +172,10 @@ _config: ClerkConfig | None = None
 
 def get_clerk_config() -> ClerkConfig:
     """Get the global Clerk configuration instance.
-    
+
     Returns:
         ClerkConfig: The configured Clerk settings
-        
+
     Raises:
         ValueError: If configuration is not initialized or invalid
     """
@@ -195,7 +195,7 @@ def get_clerk_config() -> ClerkConfig:
 
 def reset_clerk_config():
     """Reset the global configuration instance.
-    
+
     This is primarily used for testing purposes.
     """
     global _config

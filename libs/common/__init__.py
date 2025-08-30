@@ -16,4 +16,3 @@ __all__ = [
     "__version__",
     "get_db",
 ]
-

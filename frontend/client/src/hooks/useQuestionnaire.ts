@@ -1,6 +1,6 @@
 /**
  * Questionnaire API Hooks
- * 
+ *
  * Custom hooks for managing questionnaire data and API interactions
  * using React Query for caching and state management.
  */
@@ -80,7 +80,7 @@ const API_BASE = '/api/questionnaire';
  */
 export function useQuestionnaireStatus() {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['questionnaire', 'status'],
     queryFn: async (): Promise<QuestionnaireStatus> => {
@@ -90,18 +90,18 @@ export function useQuestionnaireStatus() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch questionnaire status');
       }
-      
+
       const result = await response.json();
-      
+
       // Handle the backend response structure: { success: true, data: {...} }
       if (result.success && result.data) {
         return result.data;
       }
-      
+
       throw new Error('Invalid response format');
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -113,7 +113,7 @@ export function useQuestionnaireStatus() {
  */
 export function useAvailableSports() {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['questionnaire', 'sports'], // Added version to invalidate cache
     queryFn: async (): Promise<{ sports: Sport[]; total_count: number }> => {
@@ -123,13 +123,13 @@ export function useAvailableSports() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch sports');
       }
-      
+
       const result = await response.json();
-      
+
       // Handle the backend response structure: { success: true, data: [...] }
       if (result.success && result.data) {
         return {
@@ -137,7 +137,7 @@ export function useAvailableSports() {
           total_count: result.data.length
         };
       }
-      
+
       throw new Error('Invalid response format');
     },
     staleTime: 30 * 60 * 1000, // 30 minutes - sports don't change often
@@ -149,7 +149,7 @@ export function useAvailableSports() {
  */
 export function useTeamsBySport(sportId: string) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['questionnaire', 'teams', sportId],
     queryFn: async (): Promise<{ teams: Team[]; total_count: number }> => {
@@ -159,11 +159,11 @@ export function useTeamsBySport(sportId: string) {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch teams');
       }
-      
+
       return response.json();
     },
     enabled: !!sportId,
@@ -176,7 +176,7 @@ export function useTeamsBySport(sportId: string) {
  */
 export function useUserPreferences() {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['questionnaire', 'preferences'],
     queryFn: async (): Promise<UserPreferences> => {
@@ -186,11 +186,11 @@ export function useUserPreferences() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch user preferences');
       }
-      
+
       return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -203,7 +203,7 @@ export function useUserPreferences() {
 export function useSaveSportPreferences() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: SportPreferenceRequest[]) => {
       const token = await getToken();
@@ -215,7 +215,7 @@ export function useSaveSportPreferences() {
         },
         body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) {
         let errorMessage = 'Failed to save sport preferences';
         try {
@@ -224,12 +224,12 @@ export function useSaveSportPreferences() {
           console.error('DEBUG: Response status:', response.status);
           console.error('DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
           console.error('DEBUG: Error type:', typeof errorResponse);
-          
+
           // Handle backend error format: {ok: false, error: {message: string, details: array}}
           const error = errorResponse.error || errorResponse;
           console.error('DEBUG: Error detail:', error.details || error.detail);
           console.error('DEBUG: Error message:', error.message);
-          
+
           const errorDetail = error.details || error.detail;
           if (Array.isArray(errorDetail)) {
             errorMessage = errorDetail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
@@ -245,14 +245,14 @@ export function useSaveSportPreferences() {
         }
         throw new Error(errorMessage);
       }
-      
+
       const result = await response.json();
-      
+
       // Handle the backend response structure: { success: true, data: [...] }
       if (result.success && result.data) {
         return result.data;
       }
-      
+
       throw new Error('Invalid response format');
     },
     onSuccess: () => {
@@ -269,7 +269,7 @@ export function useSaveSportPreferences() {
 export function useSaveSportRankings() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: SportRankingRequest) => {
       const token = await getToken();
@@ -281,7 +281,7 @@ export function useSaveSportRankings() {
         },
         body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) {
         let errorMessage = 'Failed to save sport rankings';
         try {
@@ -290,12 +290,12 @@ export function useSaveSportRankings() {
           console.error('DEBUG: Sport rankings response status:', response.status);
           console.error('DEBUG: Sport rankings response headers:', Object.fromEntries(response.headers.entries()));
           console.error('DEBUG: Sport rankings error type:', typeof errorResponse);
-          
+
           // Handle backend error format: {ok: false, error: {message: string, details: array}}
           const error = errorResponse.error || errorResponse;
           console.error('DEBUG: Sport rankings error detail:', error.details || error.detail);
           console.error('DEBUG: Sport rankings error message:', error.message);
-          
+
           const errorDetail = error.details || error.detail;
           if (Array.isArray(errorDetail)) {
             errorMessage = errorDetail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
@@ -311,14 +311,14 @@ export function useSaveSportRankings() {
         }
         throw new Error(errorMessage);
       }
-      
+
       const result = await response.json();
-      
+
       // Handle the backend response structure: { success: true, data: [...] }
       if (result.success && result.data) {
         return result.data;
       }
-      
+
       throw new Error('Invalid response format');
     },
     onSuccess: () => {
@@ -334,7 +334,7 @@ export function useSaveSportRankings() {
 export function useSaveTeamPreferences() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: FavoriteTeamsRequest) => {
       const token = await getToken();
@@ -346,7 +346,7 @@ export function useSaveTeamPreferences() {
         },
         body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) {
         let errorMessage = 'Failed to save team preferences';
         try {
@@ -361,14 +361,14 @@ export function useSaveTeamPreferences() {
         }
         throw new Error(errorMessage);
       }
-      
+
       const result = await response.json();
-      
+
       // Handle the backend response structure: { success: true, data: [...] }
       if (result.success && result.data) {
         return result.data;
       }
-      
+
       throw new Error('Invalid response format');
     },
     onSuccess: () => {
@@ -383,7 +383,7 @@ export function useSaveTeamPreferences() {
  */
 export function useTeamsForSports(sportIds: string[]) {
   const { getToken } = useAuth();
-  
+
   // Convert sportIds to strings for API calls
   const validSportIds = (sportIds || [])
     .filter((sportId) =>
@@ -392,14 +392,14 @@ export function useTeamsForSports(sportIds: string[]) {
         : sportId != null && !Number.isNaN(sportId)
     )
     .map((sportId) => sportId.toString());
-  
+
   return useQuery({
     queryKey: ['teams-for-sports', validSportIds],
     queryFn: async () => {
       if (validSportIds.length === 0) {
         return { teams: [] };
       }
-      
+
       const token = await getToken();
       const teamPromises = validSportIds.map(async (sportId) => {
         const response = await fetch(`${API_BASE}/sports/${sportId}/teams`, {
@@ -408,18 +408,18 @@ export function useTeamsForSports(sportIds: string[]) {
             'Content-Type': 'application/json',
           },
         });
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch teams for sport ${sportId}`);
         }
-        
+
         const data = await response.json();
         return data.teams || [];
       });
-      
+
       const teamsArrays = await Promise.all(teamPromises);
       const allTeams = teamsArrays.flat();
-      
+
       return { teams: allTeams };
     },
     enabled: validSportIds.length > 0,
@@ -432,7 +432,7 @@ export function useTeamsForSports(sportIds: string[]) {
  */
 export function useIsQuestionnaireCompleted() {
   const { data: status, isLoading } = useQuestionnaireStatus();
-  
+
   return {
     isCompleted: status?.is_completed ?? false,
     isLoading,

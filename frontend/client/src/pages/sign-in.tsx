@@ -24,9 +24,9 @@ export default function SignInPage() {
             Sign in to your sports media account
           </p>
         </div>
-        
+
         <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
-          <SignIn 
+          <SignIn
             appearance={{
               elements: {
                 rootBox: "mx-auto",
@@ -47,12 +47,12 @@ export default function SignInPage() {
             redirectUrl="/"
           />
         </div>
-        
+
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Don't have an account?{" "}
-            <a 
-              href="/sign-up" 
+            <a
+              href="/sign-up"
               className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
             >
               Sign up here

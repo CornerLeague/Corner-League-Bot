@@ -100,7 +100,7 @@ async def get_questionnaire_status(
             WHERE utp.user_id = :user_id AND t.is_active = true AND s.is_active = true
         ),
         user_status AS (
-            SELECT 
+            SELECT
                 sp.sport_count,
                 tp.team_count,
                 CASE WHEN sp.sport_count >= 3 THEN true ELSE false END as sports_completed,
@@ -108,12 +108,12 @@ async def get_questionnaire_status(
             FROM sport_prefs sp
             FULL OUTER JOIN team_prefs tp ON true
         )
-        SELECT 
+        SELECT
             sport_count,
             team_count,
             sports_completed,
             teams_completed,
-            CASE 
+            CASE
                 WHEN sports_completed AND teams_completed THEN 100.0
                 WHEN sports_completed OR teams_completed THEN 50.0
                 ELSE (sport_count * 16.67 + team_count * 10.0)
@@ -454,7 +454,7 @@ async def get_user_preferences(
     # Optimized query using CTEs and explicit joins
     query = text("""
         WITH sport_prefs AS (
-            SELECT 
+            SELECT
                 usp.id,
                 usp.user_id,
                 usp.sport_id,
@@ -467,7 +467,7 @@ async def get_user_preferences(
             ORDER BY usp.created_at DESC
         ),
         team_prefs AS (
-            SELECT 
+            SELECT
                 utp.id,
                 utp.user_id,
                 utp.team_id,
@@ -481,7 +481,7 @@ async def get_user_preferences(
             WHERE utp.user_id = :user_id AND t.is_active = true AND s.is_active = true
             ORDER BY utp.created_at DESC
         )
-        SELECT 
+        SELECT
             'sport' as pref_type,
             sp.id,
             sp.user_id,
@@ -493,7 +493,7 @@ async def get_user_preferences(
             sp.created_at
         FROM sport_prefs sp
         UNION ALL
-        SELECT 
+        SELECT
             'team' as pref_type,
             tp.id,
             tp.user_id,

@@ -721,11 +721,11 @@ async def main():
     <body>
         <article>
             <h1>Lakers Beat Warriors 120-115 in Overtime Thriller</h1>
-            <p>The Los Angeles Lakers defeated the Golden State Warriors 120-115 in an 
-            overtime thriller at Crypto.com Arena on Monday night. LeBron James led 
-            the Lakers with 35 points and 12 assists, while Stephen Curry scored 
+            <p>The Los Angeles Lakers defeated the Golden State Warriors 120-115 in an
+            overtime thriller at Crypto.com Arena on Monday night. LeBron James led
+            the Lakers with 35 points and 12 assists, while Stephen Curry scored
             42 points for the Warriors in the losing effort.</p>
-            <p>The game was tied 110-110 at the end of regulation before the Lakers 
+            <p>The game was tied 110-110 at the end of regulation before the Lakers
             outscored the Warriors 10-5 in the extra period to secure the victory.</p>
         </article>
     </body>
@@ -750,4 +750,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-

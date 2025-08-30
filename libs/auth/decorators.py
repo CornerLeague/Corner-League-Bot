@@ -40,13 +40,13 @@ def require_auth(
     credentials: EnhancedCredentials = Depends(get_clerk_bearer())
 ) -> EnhancedCredentials:
     """Dependency that requires valid authentication.
-    
+
     Args:
         credentials: The enhanced credentials from Clerk with decoded JWT
-        
+
     Returns:
         EnhancedCredentials: The validated credentials with user info
-        
+
     Raises:
         AuthenticationError: If authentication is missing or invalid
     """
@@ -63,14 +63,14 @@ def require_role(
     require_all: bool = False
 ) -> Callable:
     """Dependency factory that requires specific user roles.
-    
+
     Args:
         required_roles: List of roles that are required
         require_all: If True, user must have ALL roles. If False, user needs ANY role.
-        
+
     Returns:
         Callable: A dependency function that validates roles
-        
+
     Example:
         @app.get("/admin")
         async def admin_endpoint(
@@ -118,13 +118,13 @@ def require_admin(
     credentials: EnhancedCredentials = Depends(require_role(["admin"]))
 ) -> EnhancedCredentials:
     """Dependency that requires admin role.
-    
+
     Args:
         credentials: The enhanced credentials
-        
+
     Returns:
         EnhancedCredentials: The validated admin credentials
-        
+
     Raises:
         PermissionError: If user is not an admin
     """
@@ -135,13 +135,13 @@ def require_moderator(
     credentials: EnhancedCredentials = Depends(require_role(["admin", "moderator"]))
 ) -> EnhancedCredentials:
     """Dependency that requires admin or moderator role.
-    
+
     Args:
         credentials: The enhanced credentials
-        
+
     Returns:
         EnhancedCredentials: The validated credentials
-        
+
     Raises:
         PermissionError: If user is not an admin or moderator
     """
@@ -152,14 +152,14 @@ def optional_auth(
     request: Request
 ) -> dict | None:
     """Dependency that provides optional authentication.
-    
+
     This dependency checks if the user is authenticated via middleware
     but doesn't require authentication. Useful for endpoints that
     behave differently for authenticated vs anonymous users.
-    
+
     Args:
         request: The FastAPI request object
-        
+
     Returns:
         Optional[dict]: User information if authenticated, None otherwise
     """
@@ -179,12 +179,12 @@ def check_permission(
     require_all: bool = False
 ) -> bool:
     """Utility function to check if user has required permissions.
-    
+
     Args:
         user_roles: List of roles the user has
         required_roles: List of roles that are required
         require_all: If True, user must have ALL roles. If False, user needs ANY role.
-        
+
     Returns:
         bool: True if user has required permissions, False otherwise
     """
@@ -202,11 +202,11 @@ def check_resource_ownership(
     resource_owner_id: str
 ) -> bool:
     """Utility function to check if user owns a resource.
-    
+
     Args:
         user_id: The ID of the current user
         resource_owner_id: The ID of the resource owner
-        
+
     Returns:
         bool: True if user owns the resource, False otherwise
     """
@@ -218,14 +218,14 @@ def require_ownership_or_role(
     allowed_roles: list[str] = None
 ) -> Callable:
     """Dependency factory that requires resource ownership or specific roles.
-    
+
     This is useful for endpoints where users can access their own resources
     or admins/moderators can access any resource.
-    
+
     Args:
         resource_owner_id: The ID of the resource owner
         allowed_roles: List of roles that can bypass ownership check
-        
+
     Returns:
         Callable: A dependency function that validates ownership or roles
     """
@@ -261,14 +261,14 @@ def rate_limit_by_user(
     window_seconds: int = 60
 ) -> Callable:
     """Dependency factory for user-based rate limiting.
-    
+
     Note: This is a basic implementation. For production, consider using
     Redis or a dedicated rate limiting service.
-    
+
     Args:
         max_requests: Maximum number of requests allowed
         window_seconds: Time window in seconds
-        
+
     Returns:
         Callable: A dependency function that enforces rate limits
     """
@@ -310,7 +310,7 @@ def rate_limit_by_user(
 # Convenience decorators for common use cases
 def authenticated_route(func: Callable) -> Callable:
     """Decorator to mark a route as requiring authentication.
-    
+
     This is a convenience decorator that can be used instead of
     adding the Depends(require_auth) parameter.
     """
@@ -325,7 +325,7 @@ def authenticated_route(func: Callable) -> Callable:
 
 def admin_only_route(func: Callable) -> Callable:
     """Decorator to mark a route as admin-only.
-    
+
     This is a convenience decorator for documentation purposes.
     """
     @wraps(func)

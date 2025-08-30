@@ -638,10 +638,10 @@ async def main():
     # Example content
     content = {
         "title": "Lakers Beat Warriors 120-115 in Overtime Thriller",
-        "text": """The Los Angeles Lakers defeated the Golden State Warriors 120-115 in an 
-        overtime thriller at Crypto.com Arena on Monday night. LeBron James led the Lakers 
-        with 35 points and 12 assists, while Stephen Curry scored 42 points for the Warriors 
-        in the losing effort. The game was tied 110-110 at the end of regulation before the 
+        "text": """The Los Angeles Lakers defeated the Golden State Warriors 120-115 in an
+        overtime thriller at Crypto.com Arena on Monday night. LeBron James led the Lakers
+        with 35 points and 12 assists, while Stephen Curry scored 42 points for the Warriors
+        in the losing effort. The game was tied 110-110 at the end of regulation before the
         Lakers outscored the Warriors 10-5 in the extra period to secure the victory.""",
         "word_count": 65,
         "published_at": datetime.utcnow() - timedelta(hours=2),
@@ -679,4 +679,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-

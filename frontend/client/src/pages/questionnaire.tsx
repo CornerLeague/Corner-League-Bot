@@ -1,6 +1,6 @@
 /**
  * Questionnaire Page
- * 
+ *
  * A dynamic questionnaire component that guides users through sports and team preferences
  * with conditional logic and real-time preference storage.
  */
@@ -12,11 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProtectedRoute } from '@/components/auth';
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  Check, 
-  Star, 
+import {
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  Star,
   Trophy,
   Users,
   Loader2,
@@ -60,17 +60,17 @@ type QuestionnaireStep = 'sports_selection' | 'sports_ranking' | 'teams_selectio
 export default function QuestionnairePage() {
   const { getToken } = useAuth();
   const [, setLocation] = useLocation();
-  
+
   // State management
   const [currentStep, setCurrentStep] = useState<QuestionnaireStep>('sports_selection');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // User selections
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [rankedSports, setRankedSports] = useState<string[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<{team_id: string, sport_id: string}[]>([]);
-  
+
   // API hooks
   const { data: questionnaireStatus, isLoading: statusLoading } = useQuestionnaireStatus();
   const { data: sportsData, isLoading: sportsLoading, error: sportsError } = useAvailableSports();
@@ -78,7 +78,7 @@ export default function QuestionnairePage() {
   const saveSportPreferences = useSaveSportPreferences();
   const saveSportRankings = useSaveSportRankings();
   const saveTeamPreferences = useSaveTeamPreferences();
-  
+
   const loading = statusLoading || sportsLoading || teamsQuery.isLoading;
   const sports = sportsData?.sports || [];
   const teams = teamsQuery.data?.teams || [];
@@ -116,24 +116,24 @@ export default function QuestionnairePage() {
       setError('Please select at least one sport');
       return;
     }
-    
+
     try {
       setSubmitting(true);
       setError(null);
-      
+
       // Filter out any null/undefined values and convert selected sports to preference format
       const validSportIds = selectedSports.filter(sportId => sportId != null && sportId !== '');
       const sportPreferences = validSportIds.map((sportId) => ({
         sport_id: sportId,
         interest_level: 3,
       }));
-      
+
       console.log('DEBUG: selectedSports array:', selectedSports);
       console.log('DEBUG: validSportIds array:', validSportIds);
       console.log('DEBUG: selectedSports types:', selectedSports.map(id => typeof id));
       console.log('DEBUG: sportPreferences payload:', JSON.stringify(sportPreferences, null, 2));
       await saveSportPreferences.mutateAsync(sportPreferences);
-      
+
       // If user selected multiple sports, go to ranking step
       if (Array.isArray(validSportIds) && validSportIds.length > 1) {
         setRankedSports([...validSportIds]);
@@ -155,7 +155,7 @@ export default function QuestionnairePage() {
     try {
       setSubmitting(true);
       setError(null);
-      
+
       await saveSportRankings.mutateAsync({ sport_rankings: rankedSports.map(id => id.toString()) });
       setCurrentStep('teams_selection');
     } catch (err) {
@@ -172,11 +172,11 @@ export default function QuestionnairePage() {
       setError('Please select at least one team');
       return;
     }
-    
+
     try {
       setSubmitting(true);
       setError(null);
-      
+
       await saveTeamPreferences.mutateAsync({ team_selections: selectedTeams });
       setCurrentStep('completed');
     } catch (err) {
@@ -189,8 +189,8 @@ export default function QuestionnairePage() {
   };
 
   const toggleSportSelection = (sportId: string) => {
-    setSelectedSports(prev => 
-      prev.includes(sportId) 
+    setSelectedSports(prev =>
+      prev.includes(sportId)
         ? prev.filter(id => id !== sportId)
         : [...prev, sportId]
     );
@@ -230,35 +230,35 @@ export default function QuestionnairePage() {
         <h2 className="text-2xl font-bold mb-2">Choose Your Sports</h2>
         <p className="text-gray-600">Select the sports you're most interested in following</p>
       </div>
-      
+
       {sportsLoading && (
         <div className="flex items-center justify-center p-8">
           <Loader2 className="h-6 w-6 animate-spin mr-2" />
           <span>Loading sports...</span>
         </div>
       )}
-      
+
       {sportsError && (
         <div className="flex items-center justify-center p-8 text-red-600">
           <AlertCircle className="h-6 w-6 mr-2" />
           <span>Error loading sports: {sportsError.message}</span>
         </div>
       )}
-      
+
       {!sportsLoading && !sportsError && sports.length === 0 && (
         <div className="flex items-center justify-center p-8 text-gray-500">
           <span>No sports available</span>
         </div>
       )}
-      
+
       {!sportsLoading && sports.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sports.map(sport => (
-            <Card 
+            <Card
               key={sport.id}
               className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-                selectedSports.includes(sport.id) 
-                  ? 'ring-2 ring-blue-500 bg-blue-50' 
+                selectedSports.includes(sport.id)
+                  ? 'ring-2 ring-blue-500 bg-blue-50'
                   : 'hover:bg-gray-50'
               }`}
               onClick={() => toggleSportSelection(sport.id)}
@@ -276,16 +276,16 @@ export default function QuestionnairePage() {
           ))}
         </div>
       )}
-      
+
       {error && (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md">
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm">{error}</span>
         </div>
       )}
-      
+
       <div className="flex justify-end">
-        <Button 
+        <Button
           onClick={handleSportsSelection}
           disabled={submitting || !Array.isArray(selectedSports) || selectedSports.length === 0}
           className="min-w-32"
@@ -308,7 +308,7 @@ export default function QuestionnairePage() {
         <h2 className="text-2xl font-bold mb-2">Rank Your Sports</h2>
         <p className="text-gray-600">Drag to reorder your sports by preference (most favorite first)</p>
       </div>
-      
+
       <div className="space-y-3 max-w-md mx-auto">
         {rankedSports.map((sportId, index) => {
           const sport = sports.find(s => s.id === sportId);
@@ -344,16 +344,16 @@ export default function QuestionnairePage() {
           );
         })}
       </div>
-      
+
       {error && (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md">
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm">{error}</span>
         </div>
       )}
-      
+
       <div className="flex justify-between">
-        <Button 
+        <Button
           variant="outline"
           onClick={() => setCurrentStep('sports_selection')}
           disabled={submitting}
@@ -361,7 +361,7 @@ export default function QuestionnairePage() {
           <ChevronLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <Button 
+        <Button
           onClick={handleSportsRanking}
           disabled={submitting}
           className="min-w-32"
@@ -397,12 +397,12 @@ export default function QuestionnairePage() {
           <h2 className="text-2xl font-bold mb-2">Choose Your Teams</h2>
           <p className="text-gray-600">Select your favorite teams from your chosen sports using the dropdown menus</p>
         </div>
-        
+
         {Object.entries(teamsBySport).map(([sportId, sportTeams]) => {
           const typedSportTeams = sportTeams as Team[];
           const sport = sports.find(s => s.id === sportId);
           const selectedTeamForSport = selectedTeams.find(t => t.sport_id === sportId);
-          
+
           return (
             <div key={sportId} className="space-y-3">
               <h3 className="text-lg font-semibold text-gray-800">{sport?.name}</h3>
@@ -433,7 +433,7 @@ export default function QuestionnairePage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Show selected teams for this sport */}
               {Array.isArray(selectedTeams) && selectedTeams.filter(t => t.sport_id === sportId).length > 0 && (
                 <div className="mt-2">
@@ -462,16 +462,16 @@ export default function QuestionnairePage() {
             </div>
           );
         })}
-        
+
         {error && (
           <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md">
             <AlertCircle className="h-4 w-4" />
             <span className="text-sm">{error}</span>
           </div>
         )}
-        
+
         <div className="flex justify-between">
-          <Button 
+          <Button
             variant="outline"
             onClick={() => setCurrentStep(Array.isArray(selectedSports) && selectedSports.length > 1 ? 'sports_ranking' : 'sports_selection')}
             disabled={submitting}
@@ -479,7 +479,7 @@ export default function QuestionnairePage() {
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button 
+          <Button
             onClick={handleTeamsSelection}
             disabled={submitting || !Array.isArray(selectedTeams) || selectedTeams.length === 0}
             className="min-w-32"

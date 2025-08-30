@@ -97,7 +97,7 @@ export function useUserPreferences() {
 
 export function useUpdateUserPreferences() {
   const queryClient = useQueryClient();
-  
+
   return useApiPutMutation('/api/auth/preferences', {
     onSuccess: () => {
       // Invalidate and refetch user preferences
@@ -155,7 +155,7 @@ export function useUserQuestionnairePreferences() {
 
 export function useSubmitSportPreferences() {
   const queryClient = useQueryClient();
-  
+
   return useApiMutation('/api/questionnaire/sports/preferences', {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/questionnaire/status'] });
@@ -166,7 +166,7 @@ export function useSubmitSportPreferences() {
 
 export function useSubmitTeamPreferences() {
   const queryClient = useQueryClient();
-  
+
   return useApiMutation('/api/questionnaire/teams/preferences', {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/questionnaire/status'] });

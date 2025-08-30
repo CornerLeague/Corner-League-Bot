@@ -1,6 +1,6 @@
 /**
  * AuthButton Component
- * 
+ *
  * A smart authentication button that displays different UI based on the user's
  * authentication state. Shows sign-in/sign-up buttons for unauthenticated users
  * and a user menu for authenticated users.
@@ -17,11 +17,11 @@ interface AuthButtonProps {
   className?: string;
 }
 
-export function AuthButton({ 
-  variant = 'default', 
-  size = 'default', 
+export function AuthButton({
+  variant = 'default',
+  size = 'default',
   showSignUp = true,
-  className = '' 
+  className = ''
 }: AuthButtonProps) {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
@@ -43,7 +43,7 @@ export function AuthButton({
         <span className="text-sm text-gray-600 hidden sm:inline">
           Welcome, {user.firstName || user.username || 'User'}
         </span>
-        <UserButton 
+        <UserButton
           appearance={{
             elements: {
               avatarBox: 'h-8 w-8',
@@ -68,7 +68,7 @@ export function AuthButton({
           Sign In
         </Button>
       </SignInButton>
-      
+
       {showSignUp && (
         <SignUpButton forceRedirectUrl="/sign-up">
           <Button variant={variant} size={size}>
@@ -98,7 +98,7 @@ export function CompactAuthButton({ className = '' }: { className?: string }) {
 
   if (isSignedIn && user) {
     return (
-      <UserButton 
+      <UserButton
         appearance={{
           elements: {
             avatarBox: 'h-7 w-7',

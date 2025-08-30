@@ -4,4 +4,3 @@
 """AI services for content summarization and analysis."""
 
 __version__ = "1.0.0"
-

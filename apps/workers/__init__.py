@@ -4,4 +4,3 @@
 """Background workers for sports media platform."""
 
 __version__ = "1.0.0"
-

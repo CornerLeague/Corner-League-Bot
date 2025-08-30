@@ -102,7 +102,7 @@ async def create_index(db_session, index_config):
         # Check if index already exists
         check_query = text("""
             SELECT COUNT(*) as count
-            FROM pg_indexes 
+            FROM pg_indexes
             WHERE indexname = :index_name
         """)
 

@@ -247,10 +247,10 @@ class ChaosEngineer:
         try:
             # Database metrics
             db_stats = await self.connection_pool.fetchrow("""
-                SELECT 
+                SELECT
                     COUNT(*) as active_connections,
                     AVG(extract(epoch from (now() - query_start))) as avg_query_time
-                FROM pg_stat_activity 
+                FROM pg_stat_activity
                 WHERE state = 'active'
             """)
 
@@ -448,10 +448,10 @@ class ChaosEngineer:
         try:
             # Database metrics
             db_stats = await self.connection_pool.fetchrow("""
-                SELECT 
+                SELECT
                     COUNT(*) as active_connections,
                     AVG(extract(epoch from (now() - query_start))) as avg_query_time
-                FROM pg_stat_activity 
+                FROM pg_stat_activity
                 WHERE state = 'active'
             """)
 
@@ -507,7 +507,7 @@ class ChaosEngineer:
         try:
             # Test more complex query
             await self.connection_pool.fetch("""
-                SELECT COUNT(*) FROM content_items 
+                SELECT COUNT(*) FROM content_items
                 WHERE created_at >= NOW() - INTERVAL '1 hour'
                 LIMIT 1
             """)
@@ -873,4 +873,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

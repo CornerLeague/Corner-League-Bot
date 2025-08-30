@@ -516,7 +516,7 @@ class TrendingDetector:
                 AND ci.created_at >= datetime('now', '-24 hours')
                 AND ci.is_active = 1
             )
-            SELECT 
+            SELECT
                 COUNT(CASE WHEN created_at >= datetime('now', '-1 hour') THEN 1 END) as count_1h,
                 COUNT(CASE WHEN created_at >= datetime('now', '-6 hours') THEN 1 END) as count_6h,
                 COUNT(*) as count_24h
@@ -730,4 +730,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

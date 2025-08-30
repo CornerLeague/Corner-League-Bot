@@ -1,6 +1,6 @@
 /**
  * ProtectedRoute Component
- * 
+ *
  * A wrapper component that ensures only authenticated users can access
  * certain routes. Redirects unauthenticated users to sign-in.
  */
@@ -18,8 +18,8 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   fallback,
   requireRole,
   redirectTo = '/sign-in'
@@ -53,7 +53,7 @@ export function ProtectedRoute({
           <p className="text-gray-600 mb-6">
             You need to sign in to access this page.
           </p>
-          <Button 
+          <Button
             onClick={() => window.location.href = redirectTo}
             className="w-full"
           >
@@ -88,7 +88,7 @@ export function ProtectedRoute({
  */
 export function useRequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
-  
+
   return {
     isLoaded,
     isAuthenticated: isSignedIn,
