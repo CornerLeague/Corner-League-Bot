@@ -226,7 +226,13 @@ export function useSaveSportPreferences() {
           console.error('DEBUG: Error type:', typeof error);
           console.error('DEBUG: Error detail:', error.detail);
           console.error('DEBUG: Error message:', error.message);
-          errorMessage = error.detail || error.message || errorMessage;
+          if (Array.isArray(error.detail)) {
+            errorMessage = error.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+          } else if (typeof error.detail === 'object' && error.detail !== null) {
+            errorMessage = JSON.stringify(error.detail);
+          } else {
+            errorMessage = error.detail || error.message || errorMessage;
+          }
         } catch (parseError) {
           console.error('DEBUG: Failed to parse error response:', parseError);
           // If response is not JSON (e.g., HTML error page), use status text
@@ -281,7 +287,13 @@ export function useSaveSportRankings() {
           console.error('DEBUG: Sport rankings error type:', typeof error);
           console.error('DEBUG: Sport rankings error detail:', error.detail);
           console.error('DEBUG: Sport rankings error message:', error.message);
-          errorMessage = error.detail || error.message || errorMessage;
+          if (Array.isArray(error.detail)) {
+            errorMessage = error.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+          } else if (typeof error.detail === 'object' && error.detail !== null) {
+            errorMessage = JSON.stringify(error.detail);
+          } else {
+            errorMessage = error.detail || error.message || errorMessage;
+          }
         } catch (parseError) {
           console.error('DEBUG: Failed to parse sport rankings error response:', parseError);
           // If response is not JSON (e.g., HTML error page), use status text

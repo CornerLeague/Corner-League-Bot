@@ -122,9 +122,9 @@ export default function QuestionnairePage() {
       setError(null);
       
       // Convert selected sports to preference format with default interest level of 3 (moderate)
-      const sportPreferences = selectedSports.map(sportId => ({
-        sport_id: sportId,
-        interest_level: 3
+      const sportPreferences = selectedSports.map((sportId) => ({
+        sport_id: Number(sportId),
+        interest_level: 3,
       }));
       
       console.log('DEBUG: selectedSports array:', selectedSports);
