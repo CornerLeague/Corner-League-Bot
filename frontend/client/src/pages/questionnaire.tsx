@@ -122,7 +122,12 @@ export default function QuestionnairePage() {
       setError(null);
 
       // Filter out any null/undefined values and convert selected sports to preference format
-      const validSportIds = selectedSports.filter(sportId => sportId != null && sportId !== '');
+      const validSportIds = selectedSports.filter(
+        (sportId) => sportId != null && sportId !== ''
+      );
+
+      // Ensure state only contains valid selections
+      setSelectedSports(validSportIds);
       const sportPreferences = validSportIds.map((sportId) => ({
         sport_id: sportId,
         interest_level: 3,
