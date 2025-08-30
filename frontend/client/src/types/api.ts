@@ -521,13 +521,14 @@ export interface components {
             /** Sport Ids */
             sport_ids: string[];
         };
-        /** FavoriteTeamsRequest */
-        FavoriteTeamsRequest: {
-            /** Team Selections */
-            team_selections: {
-                [key: string]: unknown;
-            }[];
+        /** TeamPreferenceRequest */
+        TeamPreferenceRequest: {
+            team_id: string;
+            interest_level: number;
         };
+
+        /** FavoriteTeamsRequest */
+        FavoriteTeamsRequest: components["schemas"]["TeamPreferenceRequest"][];
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */

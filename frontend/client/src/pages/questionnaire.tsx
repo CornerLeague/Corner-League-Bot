@@ -122,7 +122,12 @@ export default function QuestionnairePage() {
       setError(null);
 
       // Filter out any null/undefined values and convert selected sports to preference format
-      const validSportIds = selectedSports.filter(sportId => sportId != null && sportId !== '');
+      const validSportIds = selectedSports.filter(
+        (sportId) => sportId != null && sportId !== ''
+      );
+
+      // Ensure state only contains valid selections
+      setSelectedSports(validSportIds);
       const sportPreferences = validSportIds.map((sportId) => ({
         sport_id: sportId,
         interest_level: 3,
@@ -176,8 +181,11 @@ export default function QuestionnairePage() {
     try {
       setSubmitting(true);
       setError(null);
-
-      await saveTeamPreferences.mutateAsync({ team_selections: selectedTeams });
+      const teamPreferences = selectedTeams.map(team => ({
+        team_id: team.team_id,
+        interest_level: 3,
+      }));
+      await saveTeamPreferences.mutateAsync(teamPreferences);
       setCurrentStep('completed');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save team preferences';
