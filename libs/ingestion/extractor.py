@@ -22,6 +22,17 @@ from trafilatura import extract
 logger = logging.getLogger(__name__)
 
 
+__all__ = [
+    "URLCanonicalizer",
+    "CanonicalURLExtractor",
+    "ContentHasher",
+    "NearDuplicateDetector",
+    "DuplicateDetector",
+    "ContentExtractor",
+    "ExtractionPipeline",
+]
+
+
 class URLCanonicalizer:
     """Canonicalizes URLs for deduplication"""
 
@@ -126,6 +137,19 @@ class URLCanonicalizer:
             logger.warning(f"Failed to extract canonical URL from HTML: {e}")
 
         return None
+
+
+class CanonicalURLExtractor:
+    """Thin wrapper around URLCanonicalizer for backward compatibility."""
+
+    def __init__(self, canonicalizer: URLCanonicalizer | None = None) -> None:
+        self._canonicalizer = canonicalizer or URLCanonicalizer()
+
+    def canonicalize(self, url: str, follow_redirects: bool = True) -> str:
+        return self._canonicalizer.canonicalize(url, follow_redirects=follow_redirects)
+
+    def extract_canonical_from_html(self, html_content: str, base_url: str) -> str | None:
+        return self._canonicalizer.extract_canonical_from_html(html_content, base_url)
 
 
 class ContentHasher:
@@ -277,6 +301,9 @@ class NearDuplicateDetector:
                     del self.content_hashes[content_hash]
                 except:
                     pass  # Ignore errors during cleanup
+
+
+DuplicateDetector = NearDuplicateDetector
 
 
 class ContentExtractor:
