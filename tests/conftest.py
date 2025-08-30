@@ -247,6 +247,31 @@ def pytest_configure(config):
 
 
 # Test collection configuration
+@pytest.fixture(autouse=True)
+def mock_clerk_auth():
+    """Mock Clerk authentication to prevent initialization during imports.
+
+    This fixture automatically mocks get_clerk_bearer to return a mock
+    that doesn't trigger Clerk configuration initialization.
+    """
+    from unittest.mock import patch
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    # Create a mock HTTPAuthorizationCredentials for testing
+    mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
+    mock_credentials.user_id = "test_user_123"
+    mock_credentials.scheme = "Bearer"
+    mock_credentials.credentials = "mock_token"
+
+    # Create a mock bearer that returns our mock credentials
+    mock_bearer = MagicMock()
+    mock_bearer.return_value = mock_credentials
+
+    # Patch get_clerk_bearer to return our mock
+    with patch('libs.auth.middleware.get_clerk_bearer', return_value=mock_bearer):
+        yield mock_credentials
+
+
 def pytest_collection_modifyitems(config, items):
     """Modify test collection to add markers based on file paths."""
     for item in items:
