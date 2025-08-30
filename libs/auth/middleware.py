@@ -101,6 +101,9 @@ class ClerkTokenValidator:
             timeout=self.config.request_timeout,
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
         )
+        # Track in-flight JWKS fetches and per-URL locks for cleanup
+        self._pending_requests: Dict[str, asyncio.Task] = {}
+        self._jwks_locks: Dict[str, asyncio.Lock] = {}
     
     async def _fetch_jwks(self, jwks_url: str) -> Dict[str, Any]:
         """Fetch JWKS from Clerk's endpoint with caching and concurrency safety."""

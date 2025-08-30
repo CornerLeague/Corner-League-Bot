@@ -130,11 +130,14 @@ class ClerkConfig(BaseSettings):
     
     def is_production(self) -> bool:
         """Check if running in production mode.
-        
+
         Returns:
-            bool: True if using live keys, False for test keys
+            bool: True if using live keys, False otherwise.
+
+        Safely handles missing publishable key by treating it as non-production.
         """
-        return self.clerk_publishable_key.startswith('pk_live_')
+        key = self.clerk_publishable_key or ""
+        return key.startswith("pk_live_")
     
     def validate_configuration(self) -> bool:
         """Validate the complete configuration.
