@@ -306,6 +306,19 @@ class DuplicateDetector(NearDuplicateDetector):
     """
 
     def __init__(self, _redis_client=None, *args, **kwargs):  # noqa: D401 - see class docstring
+        # Remove legacy Redis client keyword arguments that are not
+        # supported by ``NearDuplicateDetector``. This preserves backward
+        # compatibility with callers that previously instantiated the
+        # detector with parameters like ``redis_client=...``.
+        for key in (
+            "redis_client",
+            "redis",
+            "client",
+            "redis_conn",
+            "redis_connection",
+        ):
+            kwargs.pop(key, None)
+
         super().__init__(*args, **kwargs)
 
 
