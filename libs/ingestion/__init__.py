@@ -5,3 +5,24 @@
 
 __version__ = "1.0.0"
 
+from .extractor import (
+    CanonicalURLExtractor,
+    ContentExtractor,
+    ContentHasher,
+    DuplicateDetector,
+    ExtractionPipeline,
+    NearDuplicateDetector,
+    URLCanonicalizer,
+)
+
+__all__ = [
+    "CanonicalURLExtractor",
+    "ContentExtractor",
+    "ContentHasher",
+    "DuplicateDetector",
+    "ExtractionPipeline",
+    "NearDuplicateDetector",
+    "URLCanonicalizer",
+    "__version__",
+]
+

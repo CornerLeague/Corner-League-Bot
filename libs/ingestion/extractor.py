@@ -21,6 +21,16 @@ from trafilatura import extract
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "URLCanonicalizer",
+    "CanonicalURLExtractor",
+    "ContentHasher",
+    "NearDuplicateDetector",
+    "DuplicateDetector",
+    "ContentExtractor",
+    "ExtractionPipeline",
+]
+
 
 __all__ = [
     "URLCanonicalizer",
@@ -139,17 +149,6 @@ class URLCanonicalizer:
         return None
 
 
-class CanonicalURLExtractor:
-    """Thin wrapper around URLCanonicalizer for backward compatibility."""
-
-    def __init__(self, canonicalizer: URLCanonicalizer | None = None) -> None:
-        self._canonicalizer = canonicalizer or URLCanonicalizer()
-
-    def canonicalize(self, url: str, follow_redirects: bool = True) -> str:
-        return self._canonicalizer.canonicalize(url, follow_redirects=follow_redirects)
-
-    def extract_canonical_from_html(self, html_content: str, base_url: str) -> str | None:
-        return self._canonicalizer.extract_canonical_from_html(html_content, base_url)
 
 
 class ContentHasher:
@@ -303,15 +302,40 @@ class NearDuplicateDetector:
                     pass  # Ignore errors during cleanup
 
 
-DuplicateDetector = NearDuplicateDetector
+
+
+    The original implementation accepted a Redis client as the first
+    positional argument. To maintain drop-in compatibility while using
+    the newer ``NearDuplicateDetector`` implementation, this class
+    ignores the optional Redis client argument and forwards any
+    remaining parameters to ``NearDuplicateDetector``.
+    """
+
+    def __init__(self, _redis_client=None, *args, **kwargs):  # noqa: D401 - see class docstring
+        super().__init__(*args, **kwargs)
 
 
 class ContentExtractor:
-    """Extracts and processes content from HTML"""
+    """Extracts and processes content from HTML."""
 
-    def __init__(self):
-        self.canonicalizer = URLCanonicalizer()
+    def __init__(
+        self,
+        _settings: Any | None = None,
+        canonical_extractor: URLCanonicalizer | None = None,
+        duplicate_detector: NearDuplicateDetector | None = None,
+    ):
+        """Create a new :class:`ContentExtractor`.
+
+        Previous versions required a ``settings`` object, a canonical URL
+        extractor and an optional duplicate detector. These parameters are
+        accepted for backward compatibility but are not required by the
+        current implementation.
+        """
+
+        self.settings = _settings
+        self.canonicalizer = canonical_extractor or URLCanonicalizer()
         self.hasher = ContentHasher()
+        self.duplicate_detector = duplicate_detector
 
         # Sports-specific keywords for relevance detection
         self.sports_keywords = {
