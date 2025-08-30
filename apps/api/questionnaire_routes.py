@@ -1,22 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.security import HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, text
-from typing import List, Optional
-from pydantic import BaseModel
 
-from libs.auth.decorators import require_auth
-from libs.common.database import get_db
-from libs.common.questionnaire_models import (
-    Sport, Team, UserSportPreference, UserTeamPreference
-)
-from libs.api.response import ApiResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import BaseModel
+from sqlalchemy import delete, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from libs.api.mappers import (
     map_sport_to_response,
     map_team_to_response,
     map_user_sport_preference_to_response,
-    map_user_team_preference_to_response
+    map_user_team_preference_to_response,
 )
+from libs.api.response import ApiResponse
+from libs.auth.decorators import require_auth
+from libs.common.database import get_db
+from libs.common.questionnaire_models import Sport, Team, UserSportPreference, UserTeamPreference
 
 router = APIRouter()
 
@@ -25,7 +23,7 @@ class SportResponse(BaseModel):
     id: int
     name: str
     display_name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
 
 class TeamResponse(BaseModel):
@@ -33,29 +31,29 @@ class TeamResponse(BaseModel):
     name: str
     display_name: str
     sport_id: int
-    sport_name: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    country: Optional[str]
-    league: Optional[str]
+    sport_name: str | None
+    city: str | None
+    state: str | None
+    country: str | None
+    league: str | None
     is_active: bool
 
 class UserSportPreferenceResponse(BaseModel):
     id: int
     user_id: str
     sport_id: int
-    sport_name: Optional[str]
+    sport_name: str | None
     interest_level: int
-    created_at: Optional[str]
+    created_at: str | None
 
 class UserTeamPreferenceResponse(BaseModel):
     id: int
     user_id: str
     team_id: int
-    team_name: Optional[str]
-    sport_name: Optional[str]
+    team_name: str | None
+    sport_name: str | None
     interest_level: int
-    created_at: Optional[str]
+    created_at: str | None
 
 class QuestionnaireStatusResponse(BaseModel):
     user_id: str
@@ -75,7 +73,7 @@ class TeamPreferenceRequest(BaseModel):
     interest_level: int
 
 class SportRankingRequest(BaseModel):
-    sport_rankings: List[str]
+    sport_rankings: list[str]
 
 @router.get("/status", response_model=ApiResponse[QuestionnaireStatusResponse])
 async def get_questionnaire_status(
@@ -122,10 +120,10 @@ async def get_questionnaire_status(
             END as completion_percentage
         FROM user_status
     """)
-    
+
     result = await db.execute(query, {"user_id": user_id})
     row = result.fetchone()
-    
+
     if not row:
         # No preferences found, return default status
         response_data = QuestionnaireStatusResponse(
@@ -145,39 +143,39 @@ async def get_questionnaire_status(
             total_teams_selected=row.team_count or 0,
             completion_percentage=float(row.completion_percentage or 0.0)
         )
-    
+
     return ApiResponse(success=True, data=response_data)
 
-@router.get("/sports", response_model=ApiResponse[List[SportResponse]])
+@router.get("/sports", response_model=ApiResponse[list[SportResponse]])
 async def get_available_sports(db: AsyncSession = Depends(get_db)):
     """Get all available sports."""
-    
+
     # Use explicit select with where clause
     stmt = select(Sport).where(Sport.is_active == True).order_by(Sport.display_name)
     result = await db.execute(stmt)
     sports = result.scalars().all()
-    
+
     response_data = [map_sport_to_response(sport) for sport in sports]
     return ApiResponse(success=True, data=response_data)
 
-@router.get("/teams", response_model=ApiResponse[List[TeamResponse]])
+@router.get("/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport(
     sport_id: int = Query(..., description="Sport ID to filter teams"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get teams for a specific sport."""
-    
+
     # Verify sport exists and is active
     sport_stmt = select(Sport).where(Sport.id == sport_id, Sport.is_active == True)
     result = await db.execute(sport_stmt)
     sport = result.scalar_one_or_none()
-    
+
     if not sport:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sport with ID {sport_id} not found or inactive"
         )
-    
+
     # Get teams for the sport with explicit join
     teams_stmt = (
         select(Team)
@@ -191,28 +189,28 @@ async def get_teams_by_sport(
     )
     result = await db.execute(teams_stmt)
     teams = result.scalars().all()
-    
+
     response_data = [map_team_to_response(team) for team in teams]
     return ApiResponse(success=True, data=response_data)
 
-@router.get("/sports/{sport_id}/teams", response_model=ApiResponse[List[TeamResponse]])
+@router.get("/sports/{sport_id}/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport_path(
     sport_id: int,
     db: AsyncSession = Depends(get_db)
 ):
     """Get teams for a specific sport (path parameter version)."""
-    
+
     # Verify sport exists and is active
     sport_stmt = select(Sport).where(Sport.id == sport_id, Sport.is_active == True)
     result = await db.execute(sport_stmt)
     sport = result.scalar_one_or_none()
-    
+
     if not sport:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sport with ID {sport_id} not found or inactive"
         )
-    
+
     # Get teams for the sport with explicit join
     teams_stmt = (
         select(Team)
@@ -226,16 +224,16 @@ async def get_teams_by_sport_path(
     )
     result = await db.execute(teams_stmt)
     teams = result.scalars().all()
-    
+
     response_data = [map_team_to_response(team) for team in teams]
     return ApiResponse(success=True, data=response_data)
 
 @router.post(
     "/sports/preferences",
-    response_model=ApiResponse[List[UserSportPreferenceResponse]],
+    response_model=ApiResponse[list[UserSportPreferenceResponse]],
 )
 async def save_sport_preferences(
-    preferences: List[SportPreferenceRequest],
+    preferences: list[SportPreferenceRequest],
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: AsyncSession = Depends(get_db)
 ):
@@ -246,7 +244,7 @@ async def save_sport_preferences(
     print(f"DEBUG: Raw preferences type: {type(preferences)}")
     print(f"DEBUG: Raw preferences: {preferences}")
     print(f"DEBUG: Preferences length: {len(preferences) if preferences else 'None'}")
-    
+
     if preferences:
         for i, pref in enumerate(preferences):
             print(f"DEBUG: Preference {i}: sport_id={pref.sport_id} (type: {type(pref.sport_id)}), interest_level={pref.interest_level} (type: {type(pref.interest_level)})")
@@ -258,25 +256,25 @@ async def save_sport_preferences(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Interest level must be between 1 and 5, got {pref.interest_level}"
             )
-    
+
     # Validate sport IDs exist and are active
     sport_ids = [pref.sport_id for pref in preferences]
     sports_stmt = select(Sport).where(Sport.id.in_(sport_ids), Sport.is_active == True)
     result = await db.execute(sports_stmt)
     existing_sports = result.scalars().all()
     existing_sport_ids = {sport.id for sport in existing_sports}
-    
+
     invalid_sport_ids = set(sport_ids) - existing_sport_ids
     if invalid_sport_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or inactive sport IDs: {list(invalid_sport_ids)}"
         )
-    
+
     # Delete existing preferences
     delete_stmt = delete(UserSportPreference).where(UserSportPreference.user_id == user_id)
     await db.execute(delete_stmt)
-    
+
     # Add new preferences
     new_preferences = []
     for pref in preferences:
@@ -287,19 +285,19 @@ async def save_sport_preferences(
         )
         db.add(new_pref)
         new_preferences.append(new_pref)
-    
+
     await db.commit()
-    
+
     # Refresh to get relationships loaded
     for pref in new_preferences:
         await db.refresh(pref)
-    
+
     response_data = [map_user_sport_preference_to_response(pref) for pref in new_preferences]
     return ApiResponse(success=True, data=response_data)
 
 @router.post(
     "/sports/ranking",
-    response_model=ApiResponse[List[str]],
+    response_model=ApiResponse[list[str]],
 )
 async def save_sport_rankings(
     request: SportRankingRequest,
@@ -307,10 +305,10 @@ async def save_sport_rankings(
     db: AsyncSession = Depends(get_db)
 ):
     """Save user sport rankings (preference order)."""
-    
+
     user_id = credentials.user_id
     sport_rankings = request.sport_rankings
-    
+
     # Validate that all sport IDs are valid integers and exist
     try:
         sport_ids = [int(sport_id) for sport_id in sport_rankings]
@@ -319,20 +317,20 @@ async def save_sport_rankings(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="All sport rankings must be valid integer IDs"
         )
-    
+
     # Verify all sports exist and are active
     sports_stmt = select(Sport).where(Sport.id.in_(sport_ids), Sport.is_active == True)
     result = await db.execute(sports_stmt)
     existing_sports = result.scalars().all()
     existing_sport_ids = {sport.id for sport in existing_sports}
-    
+
     invalid_sport_ids = set(sport_ids) - existing_sport_ids
     if invalid_sport_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or inactive sport IDs: {list(invalid_sport_ids)}"
         )
-    
+
     # Update the preference_order for existing sport preferences
     for order, sport_id in enumerate(sport_ids, 1):
         # Update existing preference with new order
@@ -345,7 +343,7 @@ async def save_sport_rankings(
         )
         result = await db.execute(update_stmt)
         preference = result.scalar_one_or_none()
-        
+
         if preference:
             preference.preference_order = order
         else:
@@ -357,18 +355,18 @@ async def save_sport_rankings(
                 preference_order=order
             )
             db.add(new_preference)
-    
+
     await db.commit()
-    
+
     # Return the updated rankings
     return ApiResponse(success=True, data=sport_rankings)
 
 @router.post(
     "/teams/preferences",
-    response_model=ApiResponse[List[UserTeamPreferenceResponse]],
+    response_model=ApiResponse[list[UserTeamPreferenceResponse]],
 )
 async def save_team_preferences(
-    preferences: List[TeamPreferenceRequest],
+    preferences: list[TeamPreferenceRequest],
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db: AsyncSession = Depends(get_db)
 ):
@@ -383,7 +381,7 @@ async def save_team_preferences(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Interest level must be between 1 and 5, got {pref.interest_level}"
             )
-    
+
     # Validate team IDs exist and are active with explicit join
     team_ids = [pref.team_id for pref in preferences]
     teams_stmt = (
@@ -398,18 +396,18 @@ async def save_team_preferences(
     result = await db.execute(teams_stmt)
     existing_teams = result.scalars().all()
     existing_team_ids = {team.id for team in existing_teams}
-    
+
     invalid_team_ids = set(team_ids) - existing_team_ids
     if invalid_team_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or inactive team IDs: {list(invalid_team_ids)}"
         )
-    
+
     # Delete existing preferences
     delete_stmt = delete(UserTeamPreference).where(UserTeamPreference.user_id == user_id)
     await db.execute(delete_stmt)
-    
+
     # Add new preferences
     new_preferences = []
     for pref in preferences:
@@ -420,13 +418,13 @@ async def save_team_preferences(
         )
         db.add(new_pref)
         new_preferences.append(new_pref)
-    
+
     await db.commit()
-    
+
     # Refresh to get relationships loaded
     for pref in new_preferences:
         await db.refresh(pref)
-    
+
     response_data = [map_user_team_preference_to_response(pref) for pref in new_preferences]
     return ApiResponse(success=True, data=response_data)
 
@@ -494,15 +492,15 @@ async def get_user_preferences(
         FROM team_prefs tp
         ORDER BY created_at DESC
     """)
-    
+
     result = await db.execute(query, {"user_id": user_id})
     results = result.fetchall()
-    
+
     sport_preferences = []
     team_preferences = []
-    
+
     for row in results:
-        if row.pref_type == 'sport':
+        if row.pref_type == "sport":
             sport_preferences.append({
                 "id": row.id,
                 "user_id": row.user_id,
@@ -511,7 +509,7 @@ async def get_user_preferences(
                 "interest_level": row.interest_level,
                 "created_at": row.created_at.isoformat() if row.created_at else None
             })
-        elif row.pref_type == 'team':
+        elif row.pref_type == "team":
             team_preferences.append({
                 "id": row.id,
                 "user_id": row.user_id,
@@ -521,10 +519,10 @@ async def get_user_preferences(
                 "interest_level": row.interest_level,
                 "created_at": row.created_at.isoformat() if row.created_at else None
             })
-    
+
     response_data = {
         "sport_preferences": sport_preferences,
         "team_preferences": team_preferences
     }
-    
+
     return ApiResponse(success=True, data=response_data)

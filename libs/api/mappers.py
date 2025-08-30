@@ -1,12 +1,6 @@
-from typing import List
-from datetime import datetime
 from libs.auth.user_service import UserProfile
-from libs.common.questionnaire_models import (
-    UserSportPreference, 
-    UserTeamPreference,
-    Sport,
-    Team
-)
+from libs.common.questionnaire_models import Sport, Team, UserSportPreference, UserTeamPreference
+
 
 # Auth Response Mappers
 def map_user_profile_to_response(profile: UserProfile) -> dict:
@@ -87,10 +81,10 @@ def map_content_item_to_response(item) -> dict:
 def map_user_stats_to_response(stats) -> dict:
     """Convert user stats to API response format."""
     return {
-        "articles_read": getattr(stats, 'articles_read', 0),
-        "articles_saved": getattr(stats, 'articles_saved', 0),
-        "articles_shared": getattr(stats, 'articles_shared', 0),
-        "total_reading_time": getattr(stats, 'total_reading_time', 0),
-        "favorite_topics": getattr(stats, 'favorite_topics', []),
-        "activity_streak": getattr(stats, 'activity_streak', 0)
+        "articles_read": getattr(stats, "articles_read", 0),
+        "articles_saved": getattr(stats, "articles_saved", 0),
+        "articles_shared": getattr(stats, "articles_shared", 0),
+        "total_reading_time": getattr(stats, "total_reading_time", 0),
+        "favorite_topics": getattr(stats, "favorite_topics", []),
+        "activity_streak": getattr(stats, "activity_streak", 0)
     }

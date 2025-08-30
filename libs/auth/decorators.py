@@ -5,19 +5,19 @@ access control and permission checking in FastAPI routes.
 """
 
 import logging
-from typing import List, Optional, Callable, Any
+from collections.abc import Callable
 from functools import wraps
-from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import HTTPAuthorizationCredentials
 
-from .middleware import get_clerk_bearer, EnhancedCredentials
+from fastapi import Depends, HTTPException, Request, status
+
+from .middleware import EnhancedCredentials, get_clerk_bearer
 
 logger = logging.getLogger(__name__)
 
 
 class PermissionError(HTTPException):
     """Custom exception for permission-related errors."""
-    
+
     def __init__(self, detail: str = "Insufficient permissions"):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -27,7 +27,7 @@ class PermissionError(HTTPException):
 
 class AuthenticationError(HTTPException):
     """Custom exception for authentication-related errors."""
-    
+
     def __init__(self, detail: str = "Authentication required"):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,13 +53,13 @@ def require_auth(
     if not credentials:
         logger.warning("Authentication required but no credentials provided")
         raise AuthenticationError("Authentication required")
-    
+
     logger.debug(f"Authenticated request for user: {getattr(credentials, 'user_id', 'unknown')}")
     return credentials
 
 
 def require_role(
-    required_roles: List[str],
+    required_roles: list[str],
     require_all: bool = False
 ) -> Callable:
     """Dependency factory that requires specific user roles.
@@ -84,10 +84,10 @@ def require_role(
         # Skip validation if credentials is None (during module import)
         if credentials is None:
             return credentials
-            
-        user_roles = getattr(credentials, 'user_roles', [])
-        user_id = getattr(credentials, 'user_id', 'unknown')
-        
+
+        user_roles = getattr(credentials, "user_roles", [])
+        user_id = getattr(credentials, "user_id", "unknown")
+
         if require_all:
             # User must have ALL required roles
             missing_roles = set(required_roles) - set(user_roles)
@@ -107,10 +107,10 @@ def require_role(
                 raise PermissionError(
                     f"Requires one of: {', '.join(required_roles)}"
                 )
-        
+
         logger.debug(f"Role check passed for user {user_id} with roles: {user_roles}")
         return credentials
-    
+
     return role_dependency
 
 
@@ -150,7 +150,7 @@ def require_moderator(
 
 def optional_auth(
     request: Request
-) -> Optional[dict]:
+) -> dict | None:
     """Dependency that provides optional authentication.
     
     This dependency checks if the user is authenticated via middleware
@@ -163,19 +163,19 @@ def optional_auth(
     Returns:
         Optional[dict]: User information if authenticated, None otherwise
     """
-    if hasattr(request.state, 'authenticated') and request.state.authenticated:
+    if hasattr(request.state, "authenticated") and request.state.authenticated:
         return {
-            'user_id': getattr(request.state, 'user_id', None),
-            'user_email': getattr(request.state, 'user_email', None),
-            'user_roles': getattr(request.state, 'user_roles', []),
-            'user': getattr(request.state, 'user', None)
+            "user_id": getattr(request.state, "user_id", None),
+            "user_email": getattr(request.state, "user_email", None),
+            "user_roles": getattr(request.state, "user_roles", []),
+            "user": getattr(request.state, "user", None)
         }
     return None
 
 
 def check_permission(
-    user_roles: List[str],
-    required_roles: List[str],
+    user_roles: list[str],
+    required_roles: list[str],
     require_all: bool = False
 ) -> bool:
     """Utility function to check if user has required permissions.
@@ -190,7 +190,7 @@ def check_permission(
     """
     if not required_roles:
         return True
-    
+
     if require_all:
         return set(required_roles).issubset(set(user_roles))
     else:
@@ -215,7 +215,7 @@ def check_resource_ownership(
 
 def require_ownership_or_role(
     resource_owner_id: str,
-    allowed_roles: List[str] = None
+    allowed_roles: list[str] = None
 ) -> Callable:
     """Dependency factory that requires resource ownership or specific roles.
     
@@ -231,28 +231,28 @@ def require_ownership_or_role(
     """
     if allowed_roles is None:
         allowed_roles = ["admin", "moderator"]
-    
+
     def ownership_dependency(
         credentials: EnhancedCredentials = Depends(require_auth)
     ) -> EnhancedCredentials:
-        user_id = getattr(credentials, 'user_id', '')
-        user_roles = getattr(credentials, 'user_roles', [])
-        
+        user_id = getattr(credentials, "user_id", "")
+        user_roles = getattr(credentials, "user_roles", [])
+
         # Check if user owns the resource
         if check_resource_ownership(user_id, resource_owner_id):
             logger.debug(f"Resource access granted to owner: {user_id}")
             return credentials
-        
+
         # Check if user has required role
         if check_permission(user_roles, allowed_roles):
             logger.debug(f"Resource access granted to {user_id} with roles: {user_roles}")
             return credentials
-        
+
         logger.warning(
             f"User {user_id} denied access to resource owned by {resource_owner_id}"
         )
         raise PermissionError("Access denied: insufficient permissions")
-    
+
     return ownership_dependency
 
 
@@ -274,23 +274,23 @@ def rate_limit_by_user(
     """
     from collections import defaultdict
     from datetime import datetime, timedelta
-    
+
     # In-memory storage (use Redis in production)
     request_counts = defaultdict(list)
-    
+
     def rate_limit_dependency(
         credentials: EnhancedCredentials = Depends(require_auth)
     ) -> EnhancedCredentials:
-        user_id = getattr(credentials, 'user_id', '')
+        user_id = getattr(credentials, "user_id", "")
         now = datetime.utcnow()
         window_start = now - timedelta(seconds=window_seconds)
-        
+
         # Clean old requests
         request_counts[user_id] = [
             timestamp for timestamp in request_counts[user_id]
             if timestamp > window_start
         ]
-        
+
         # Check rate limit
         if len(request_counts[user_id]) >= max_requests:
             logger.warning(f"Rate limit exceeded for user: {user_id}")
@@ -298,12 +298,12 @@ def rate_limit_by_user(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds} seconds"
             )
-        
+
         # Record this request
         request_counts[user_id].append(now)
-        
+
         return credentials
-    
+
     return rate_limit_dependency
 
 
@@ -319,7 +319,7 @@ def authenticated_route(func: Callable) -> Callable:
         # The actual authentication is handled by the dependency injection
         # This decorator is mainly for documentation purposes
         return await func(*args, **kwargs)
-    
+
     return wrapper
 
 
@@ -331,5 +331,5 @@ def admin_only_route(func: Callable) -> Callable:
     @wraps(func)
     async def wrapper(*args, **kwargs):
         return await func(*args, **kwargs)
-    
+
     return wrapper

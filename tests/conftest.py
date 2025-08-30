@@ -3,18 +3,18 @@
 Provides common test fixtures and configuration for all test modules.
 """
 
-import pytest
 import asyncio
+from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
-from typing import AsyncGenerator, Generator
 
+import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
 
-from libs.common.database import DatabaseManager
-from libs.common.config import Settings, DatabaseSettings
 from apps.api.main import app
+from libs.common.config import DatabaseSettings, Settings
+from libs.common.database import DatabaseManager
 
 
 @pytest.fixture(scope="session")
@@ -58,7 +58,7 @@ async def test_db_session(test_db_engine) -> AsyncGenerator[AsyncSession, None]:
         class_=AsyncSession,
         expire_on_commit=False
     )
-    
+
     async with async_session() as session:
         yield session
 
@@ -67,16 +67,16 @@ async def test_db_session(test_db_engine) -> AsyncGenerator[AsyncSession, None]:
 def mock_db_manager() -> MagicMock:
     """Create mock database manager."""
     db_manager = MagicMock(spec=DatabaseManager)
-    
+
     # Mock session context manager
     mock_session = AsyncMock(spec=AsyncSession)
     db_manager.session.return_value.__aenter__.return_value = mock_session
     db_manager.session.return_value.__aexit__.return_value = None
-    
+
     # Mock transaction context manager
     db_manager.transaction.return_value.__aenter__.return_value = mock_session
     db_manager.transaction.return_value.__aexit__.return_value = None
-    
+
     return db_manager
 
 
@@ -84,7 +84,7 @@ def mock_db_manager() -> MagicMock:
 def mock_async_session() -> AsyncMock:
     """Create mock async database session."""
     session = AsyncMock(spec=AsyncSession)
-    
+
     # Mock common session methods
     session.execute = AsyncMock()
     session.commit = AsyncMock()
@@ -93,7 +93,7 @@ def mock_async_session() -> AsyncMock:
     session.add = MagicMock()
     session.delete = MagicMock()
     session.flush = AsyncMock()
-    
+
     return session
 
 
@@ -257,7 +257,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         elif "e2e" in str(item.fspath):
             item.add_marker(pytest.mark.e2e)
-        
+
         # Add markers based on test name
         if "auth" in item.name.lower():
             item.add_marker(pytest.mark.auth)

@@ -5,19 +5,17 @@ profile operations, and authentication callbacks.
 """
 
 import logging
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
-from typing import Literal
 
-from libs.api.response import ApiResponse
 from libs.api.mappers import map_user_profile_to_response, map_user_stats_to_response
-from libs.auth.decorators import require_auth, optional_auth, require_role
-from libs.auth.user_service import get_user_service, UserService, UserPreferences
-from libs.common.database import DatabaseManager
+from libs.api.response import ApiResponse
+from libs.auth.decorators import require_auth, require_role
+from libs.auth.user_service import UserPreferences, UserService, get_user_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,28 +27,28 @@ router = APIRouter(prefix="/api/auth", tags=["authentication"])
 class UserProfileResponse(BaseModel):
     """User profile response model."""
     user_id: str
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    profile_image_url: Optional[str] = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+    profile_image_url: str | None = None
     created_at: datetime
     updated_at: datetime
-    last_sign_in_at: Optional[datetime] = None
-    roles: List[str] = Field(default_factory=list)
+    last_sign_in_at: datetime | None = None
+    roles: list[str] = Field(default_factory=list)
     is_active: bool = True
     is_verified: bool = False
 
 
 class UserPreferencesRequest(BaseModel):
     """User preferences update request."""
-    favorite_teams: Optional[List[str]] = None
-    favorite_sports: Optional[List[str]] = None
-    content_types: Optional[List[str]] = None
-    notification_email: Optional[bool] = None
-    notification_push: Optional[bool] = None
-    notification_frequency: Optional[str] = None
-    language: Optional[str] = None
+    favorite_teams: list[str] | None = None
+    favorite_sports: list[str] | None = None
+    content_types: list[str] | None = None
+    notification_email: bool | None = None
+    notification_push: bool | None = None
+    notification_frequency: str | None = None
+    language: str | None = None
 
 
 class RoleUpdateResult(BaseModel):
@@ -59,8 +57,8 @@ class RoleUpdateResult(BaseModel):
     role: str
     action: Literal["added", "removed"]
     message: str
-    timezone: Optional[str] = None
-    theme: Optional[str] = None
+    timezone: str | None = None
+    theme: str | None = None
 
 
 class UserStatsResponse(BaseModel):
@@ -69,7 +67,7 @@ class UserStatsResponse(BaseModel):
     articles_saved: int
     articles_shared: int
     total_reading_time: int
-    favorite_topics: List[str]
+    favorite_topics: list[str]
     activity_streak: int
 
 
@@ -78,25 +76,25 @@ class ActivityTrackingRequest(BaseModel):
     action: str = Field(..., description="Action performed (view, like, share, save, etc.)")
     resource_type: str = Field(..., description="Type of resource (article, video, etc.)")
     resource_id: str = Field(..., description="ID of the resource")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
 
 # Helper functions
 async def get_current_user_id(request: Request) -> str:
     """Get current user ID, raising 401 if not authenticated."""
-    user = getattr(request.state, 'user', None)
+    user = getattr(request.state, "user", None)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
-    return user.get('sub')
+    return user.get("sub")
 
 
-async def get_optional_user_id(request: Request) -> Optional[str]:
+async def get_optional_user_id(request: Request) -> str | None:
     """Get current user ID if authenticated, None otherwise."""
-    user = getattr(request.state, 'user', None)
-    return user.get('sub') if user else None
+    user = getattr(request.state, "user", None)
+    return user.get("sub") if user else None
 
 
 # Authentication routes
@@ -108,7 +106,7 @@ async def get_current_user_profile(
 ) -> UserProfileResponse:
     """Get current user's profile."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         profile = await user_service.get_or_create_user_profile(user_id)
         if not profile:
@@ -116,9 +114,9 @@ async def get_current_user_profile(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User profile not found"
             )
-        
+
         return UserProfileResponse(**map_user_profile_to_response(profile))
-        
+
     except Exception as e:
         logger.error(f"Failed to get user profile: {e}")
         raise HTTPException(
@@ -135,11 +133,11 @@ async def get_user_preferences(
 ) -> UserPreferences:
     """Get current user's preferences."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         preferences = await user_service.get_user_preferences(user_id)
         return preferences
-        
+
     except Exception as e:
         logger.error(f"Failed to get user preferences: {e}")
         raise HTTPException(
@@ -157,17 +155,17 @@ async def update_user_preferences(
 ) -> UserPreferences:
     """Update current user's preferences."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         # Get current preferences
         current_preferences = await user_service.get_user_preferences(user_id)
-        
+
         # Update only provided fields
         update_data = preferences_update.dict(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(current_preferences, field):
                 setattr(current_preferences, field, value)
-        
+
         # Save updated preferences
         success = await user_service.update_user_preferences(user_id, current_preferences)
         if not success:
@@ -175,9 +173,9 @@ async def update_user_preferences(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to update preferences"
             )
-        
+
         return current_preferences
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -196,11 +194,11 @@ async def get_user_stats(
 ) -> UserStatsResponse:
     """Get current user's statistics."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         stats = await user_service.get_user_stats(user_id)
         return UserStatsResponse(**map_user_stats_to_response(stats))
-        
+
     except Exception as e:
         logger.error(f"Failed to get user stats: {e}")
         raise HTTPException(
@@ -215,10 +213,10 @@ async def track_user_activity(
     activity: ActivityTrackingRequest,
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     user_service: UserService = Depends(get_user_service)
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Track user activity."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         success = await user_service.track_user_activity(
             user_id=user_id,
@@ -227,15 +225,15 @@ async def track_user_activity(
             resource_id=activity.resource_id,
             metadata=activity.metadata
         )
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to track activity"
             )
-        
+
         return {"status": "success", "message": "Activity tracked successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -250,22 +248,22 @@ async def track_user_activity(
 async def get_user_activity(
     request: Request,
     limit: int = 50,
-    action_filter: Optional[str] = None,
+    action_filter: str | None = None,
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     user_service: UserService = Depends(get_user_service)
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Get user activity history."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         activities = await user_service.get_user_activity(
             user_id=user_id,
             limit=limit,
             action_filter=action_filter
         )
-        
+
         return [activity.dict() for activity in activities]
-        
+
     except Exception as e:
         logger.error(f"Failed to get user activity: {e}")
         raise HTTPException(
@@ -279,10 +277,10 @@ async def delete_user_account(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     user_service: UserService = Depends(get_user_service)
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Delete current user's account and all associated data."""
     user_id = await get_current_user_id(request)
-    
+
     try:
         success = await user_service.delete_user_data(user_id)
         if not success:
@@ -290,9 +288,9 @@ async def delete_user_account(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to delete user account"
             )
-        
+
         return {"status": "success", "message": "User account deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -304,20 +302,20 @@ async def delete_user_account(
 
 
 # Admin routes
-@router.get("/users", response_model=List[UserProfileResponse])
+@router.get("/users", response_model=list[UserProfileResponse])
 async def list_users(
     request: Request,
     limit: int = 50,
     offset: int = 0,
     user_service: UserService = Depends(get_user_service),
     credentials: HTTPAuthorizationCredentials = Depends(require_role(["admin"]))
-) -> List[UserProfileResponse]:
+) -> list[UserProfileResponse]:
     """List all users (admin only)."""
     try:
         # This would need to be implemented in the user service
         # For now, return empty list
         return []
-        
+
     except Exception as e:
         logger.error(f"Failed to list users: {e}")
         raise HTTPException(
@@ -345,7 +343,7 @@ async def assign_user_role(
             message=f"Role '{role}' assigned to user {user_id}"
         )
         return ApiResponse(data=result)
-        
+
     except Exception as e:
         logger.error(f"Failed to assign role: {e}")
         raise HTTPException(
@@ -373,7 +371,7 @@ async def remove_user_role(
             message=f"Role '{role}' removed from user {user_id}"
         )
         return ApiResponse(data=result)
-        
+
     except Exception as e:
         logger.error(f"Failed to remove role: {e}")
         raise HTTPException(

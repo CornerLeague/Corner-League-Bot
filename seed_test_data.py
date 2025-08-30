@@ -8,9 +8,10 @@ import logging
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from libs.common.database import DatabaseManager
-from libs.common.config import get_settings
 from sqlalchemy import text
+
+from libs.common.config import get_settings
+from libs.common.database import DatabaseManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,17 +77,17 @@ TEST_CONTENT = [
 async def create_test_source(session, domain: str) -> str:
     """Create a test source if it doesn't exist"""
     source_id = str(uuid4())
-    
+
     # Check if source already exists
     result = await session.execute(
         text("SELECT id FROM sources WHERE domain = :domain"),
         {"domain": domain}
     )
     existing = result.fetchone()
-    
+
     if existing:
         return existing[0]
-    
+
     # Create new source
     await session.execute(
         text("""
@@ -104,27 +105,27 @@ async def create_test_source(session, domain: str) -> str:
             "reputation_score": 0.9
         }
     )
-    
+
     return source_id
 
 async def seed_database():
     """Seed the database with test content"""
     settings = get_settings()
     db_manager = DatabaseManager(settings.database.url)
-    
+
     try:
         session = await db_manager.get_session().__anext__()
-        
+
         logger.info("Seeding database with test sports content...")
-        
+
         for i, content in enumerate(TEST_CONTENT, 1):
             # Create source if needed
             source_id = await create_test_source(session, content["source_domain"])
-            
+
             # Create content item
             content_id = str(uuid4())
             published_at = datetime.utcnow() - timedelta(days=i)  # Spread out over recent days
-            
+
             await session.execute(
                 text("""
                 INSERT INTO content_items (
@@ -157,12 +158,12 @@ async def seed_database():
                     "updated_at": datetime.utcnow()
                 }
             )
-            
+
             logger.info(f"Added content item {i}: {content['title']}")
-        
+
         await session.commit()
         logger.info(f"Successfully seeded database with {len(TEST_CONTENT)} test articles")
-        
+
     except Exception as e:
         logger.error(f"Error seeding database: {e}")
         await session.rollback()

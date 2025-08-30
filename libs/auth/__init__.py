@@ -5,17 +5,17 @@ including JWT token validation, user management, and role-based access control.
 """
 
 from .clerk_config import ClerkConfig, get_clerk_config
+from .decorators import require_admin, require_auth, require_role
 from .middleware import ClerkAuthMiddleware
-from .decorators import require_auth, require_admin, require_role
 from .user_service import UserService, get_user_service
 
 __all__ = [
+    "ClerkAuthMiddleware",
     "ClerkConfig",
-    "get_clerk_config",
-    "ClerkAuthMiddleware", 
-    "require_auth",
-    "require_admin",
-    "require_role",
     "UserService",
+    "get_clerk_config",
     "get_user_service",
+    "require_admin",
+    "require_auth",
+    "require_role",
 ]

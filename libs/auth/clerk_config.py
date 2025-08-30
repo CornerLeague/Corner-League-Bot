@@ -4,11 +4,10 @@ This module provides configuration management for Clerk authentication,
 including environment variable validation and JWKS URL handling.
 """
 
-import os
-from typing import Optional, List
+import logging
+
 from pydantic import validator
 from pydantic_settings import BaseSettings
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -19,85 +18,85 @@ class ClerkConfig(BaseSettings):
     This class manages all Clerk-related configuration including API keys,
     JWKS URLs, and validation settings.
     """
-    
+
     # Clerk API Keys
-    clerk_publishable_key: Optional[str] = None
-    clerk_secret_key: Optional[str] = None
-    
+    clerk_publishable_key: str | None = None
+    clerk_secret_key: str | None = None
+
     # Clerk URLs and endpoints
-    clerk_issuer: Optional[str] = None
-    clerk_jwks_url: Optional[str] = None
-    
+    clerk_issuer: str | None = None
+    clerk_jwks_url: str | None = None
+
     # JWT Configuration
-    jwt_algorithms: List[str] = ["RS256", "ES256", "HS256"]
-    jwt_audience: Optional[str] = None
-    
+    jwt_algorithms: list[str] = ["RS256", "ES256", "HS256"]
+    jwt_audience: str | None = None
+
     # Cache settings for JWKS
     jwks_cache_ttl: int = 3600  # 1 hour in seconds
     jwks_cache_max_size: int = 100
-    
+
     # Request timeout settings
     request_timeout: int = 30
     max_retries: int = 3
-    
+
     class Config:
         env_file = ".env"
         env_prefix = "CLERK_"
         case_sensitive = False
         extra = "ignore"  # Allow extra fields to be ignored
-    
-    @validator('clerk_publishable_key')
+
+    @validator("clerk_publishable_key")
     def validate_publishable_key(cls, v):
         """Validate that the publishable key has the correct format."""
-        if v and not v.startswith('pk_'):
+        if v and not v.startswith("pk_"):
             raise ValueError("Clerk publishable key must start with 'pk_'")
         return v
-    
-    @validator('clerk_secret_key')
+
+    @validator("clerk_secret_key")
     def validate_secret_key(cls, v):
         """Validate that the secret key has the correct format."""
-        if v and not v.startswith('sk_'):
+        if v and not v.startswith("sk_"):
             raise ValueError("Clerk secret key must start with 'sk_'")
         return v
-    
-    @validator('clerk_jwks_url', always=True)
+
+    @validator("clerk_jwks_url", always=True)
     def set_jwks_url(cls, v, values):
         """Set JWKS URL based on issuer if not provided."""
         if v:
             return v
-        
-        issuer = values.get('clerk_issuer')
+
+        issuer = values.get("clerk_issuer")
         if issuer:
             return f"{issuer}/.well-known/jwks.json"
-        
+
         # Extract domain from publishable key for default JWKS URL
-        publishable_key = values.get('clerk_publishable_key', '')
-        if publishable_key.startswith('pk_test_'):
+        publishable_key = values.get("clerk_publishable_key", "")
+        if publishable_key.startswith("pk_test_"):
             # For test keys, use a default test domain pattern
             return "https://your-app.clerk.accounts.dev/.well-known/jwks.json"
-        elif publishable_key.startswith('pk_live_'):
+        elif publishable_key.startswith("pk_live_"):
             # For live keys, this should be configured explicitly
             logger.warning("JWKS URL not configured for production environment")
             return None
-        
+
         return None
-    
-    @validator('clerk_issuer', always=True)
+
+    @validator("clerk_issuer", always=True)
     def set_issuer(cls, v, values):
         """Set issuer URL if not provided."""
         if v:
             return v
-        
+
         # Extract domain from publishable key for default issuer
-        publishable_key = values.get('clerk_publishable_key', '')
-        if publishable_key.startswith('pk_test_'):
+        publishable_key = values.get("clerk_publishable_key", "")
+        if publishable_key.startswith("pk_test_"):
             return "https://your-app.clerk.accounts.dev"
-        elif publishable_key.startswith('pk_live_'):
+        elif publishable_key.startswith("pk_live_"):
             logger.warning("Issuer URL not configured for production environment")
             return None
-        
+
         return None
-    
+
     def get_jwks_url(self) -> str:
         """Get the JWKS URL for token validation.
         
@@ -112,7 +111,7 @@ class ClerkConfig(BaseSettings):
                 "JWKS URL not configured. Please set CLERK_JWKS_URL or CLERK_ISSUER"
             )
         return self.clerk_jwks_url
-    
+
     def get_issuer(self) -> str:
         """Get the issuer URL for token validation.
         
@@ -127,7 +126,7 @@ class ClerkConfig(BaseSettings):
                 "Issuer not configured. Please set CLERK_ISSUER"
             )
         return self.clerk_issuer
-    
+
     def is_production(self) -> bool:
         """Check if running in production mode.
 
@@ -138,7 +137,7 @@ class ClerkConfig(BaseSettings):
         """
         key = self.clerk_publishable_key or ""
         return key.startswith("pk_live_")
-    
+
     def validate_configuration(self) -> bool:
         """Validate the complete configuration.
         
@@ -151,24 +150,24 @@ class ClerkConfig(BaseSettings):
         try:
             self.get_jwks_url()
             self.get_issuer()
-            
+
             if self.is_production():
                 # Additional validation for production
                 if not self.clerk_jwks_url or not self.clerk_issuer:
                     raise ValueError(
                         "Production environment requires explicit JWKS URL and issuer configuration"
                     )
-            
+
             logger.info("Clerk configuration validated successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Clerk configuration validation failed: {e}")
             raise
 
 
 # Global configuration instance
-_config: Optional[ClerkConfig] = None
+_config: ClerkConfig | None = None
 
 
 def get_clerk_config() -> ClerkConfig:
@@ -181,7 +180,7 @@ def get_clerk_config() -> ClerkConfig:
         ValueError: If configuration is not initialized or invalid
     """
     global _config
-    
+
     if _config is None:
         try:
             _config = ClerkConfig()
@@ -190,7 +189,7 @@ def get_clerk_config() -> ClerkConfig:
         except Exception as e:
             logger.error(f"Failed to initialize Clerk configuration: {e}")
             raise ValueError(f"Clerk configuration error: {e}")
-    
+
     return _config
 
 

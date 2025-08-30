@@ -5,8 +5,6 @@ Seed the database with sports and teams data for the questionnaire.
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import List, Dict, Any
 
 from libs.common.config import Settings
 from libs.common.database import DatabaseManager
@@ -190,10 +188,10 @@ async def seed_sports_data():
     """Seed the database with sports and teams data."""
     settings = Settings()
     db_manager = DatabaseManager(settings.database.url)
-    
+
     try:
         logger.info("Starting sports data seeding...")
-        
+
         async with db_manager.transaction() as session:
             # Clear existing data
             logger.info("Clearing existing sports and teams data...")
@@ -203,7 +201,7 @@ async def seed_sports_data():
             await session.execute(text("DELETE FROM teams"))
             await session.execute(text("DELETE FROM sports"))
             await session.commit()
-            
+
             # Insert sports
             logger.info("Inserting sports data...")
             for sport_data in SPORTS_DATA:
@@ -215,7 +213,7 @@ async def seed_sports_data():
                 )
                 session.add(sport)
                 await session.flush()  # Get the sport ID
-                
+
                 # Insert teams for this sport
                 if sport_data["has_teams"] and "teams" in sport_data:
                     logger.info(f"Inserting teams for {sport_data['name']}...")
@@ -229,10 +227,10 @@ async def seed_sports_data():
                             is_active=True
                         )
                         session.add(team)
-            
+
             await session.commit()
             logger.info("Sports and teams data seeded successfully!")
-            
+
     except Exception as e:
         logger.error(f"Error seeding sports data: {e}")
         raise
@@ -241,8 +239,6 @@ async def seed_sports_data():
 
 
 if __name__ == "__main__":
-    import uuid
-    from uuid import uuid4
-    
+
     logging.basicConfig(level=logging.INFO)
     asyncio.run(seed_sports_data())

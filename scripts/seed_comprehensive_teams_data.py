@@ -6,8 +6,6 @@ This script populates the database with teams from Basketball, Football, Basebal
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import List, Dict, Any
 
 from libs.common.config import Settings
 from libs.common.database import DatabaseManager
@@ -53,7 +51,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Toronto Raptors", "display_name": "Toronto Raptors", "city": "Toronto", "state": "Ontario", "country": "Canada", "league": "NBA"},
             {"name": "Utah Jazz", "display_name": "Utah Jazz", "city": "Salt Lake City", "state": "Utah", "country": "USA", "league": "NBA"},
             {"name": "Washington Wizards", "display_name": "Washington Wizards", "city": "Washington", "state": "D.C.", "country": "USA", "league": "NBA"},
-            
+
             # WNBA Teams
             {"name": "Atlanta Dream", "display_name": "Atlanta Dream", "city": "Atlanta", "state": "Georgia", "country": "USA", "league": "WNBA"},
             {"name": "Chicago Sky", "display_name": "Chicago Sky", "city": "Chicago", "state": "Illinois", "country": "USA", "league": "WNBA"},
@@ -66,7 +64,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Phoenix Mercury", "display_name": "Phoenix Mercury", "city": "Phoenix", "state": "Arizona", "country": "USA", "league": "WNBA"},
             {"name": "Seattle Storm", "display_name": "Seattle Storm", "city": "Seattle", "state": "Washington", "country": "USA", "league": "WNBA"},
             {"name": "Washington Mystics", "display_name": "Washington Mystics", "city": "Washington", "state": "D.C.", "country": "USA", "league": "WNBA"},
-            
+
             # EuroLeague Teams (2024-2025 Season)
             {"name": "Real Madrid", "display_name": "Real Madrid", "city": "Madrid", "country": "Spain", "league": "EuroLeague"},
             {"name": "FC Barcelona", "display_name": "FC Barcelona", "city": "Barcelona", "country": "Spain", "league": "EuroLeague"},
@@ -139,7 +137,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Oakland Athletics", "display_name": "Oakland Athletics", "city": "Oakland", "state": "California", "country": "USA", "league": "MLB"},
             {"name": "Seattle Mariners", "display_name": "Seattle Mariners", "city": "Seattle", "state": "Washington", "country": "USA", "league": "MLB"},
             {"name": "Texas Rangers", "display_name": "Texas Rangers", "city": "Arlington", "state": "Texas", "country": "USA", "league": "MLB"},
-            
+
             # MLB Teams - National League
             {"name": "Atlanta Braves", "display_name": "Atlanta Braves", "city": "Atlanta", "state": "Georgia", "country": "USA", "league": "MLB"},
             {"name": "Miami Marlins", "display_name": "Miami Marlins", "city": "Miami", "state": "Florida", "country": "USA", "league": "MLB"},
@@ -172,7 +170,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Ottawa Senators", "display_name": "Ottawa Senators", "city": "Ottawa", "state": "Ontario", "country": "Canada", "league": "NHL"},
             {"name": "Tampa Bay Lightning", "display_name": "Tampa Bay Lightning", "city": "Tampa", "state": "Florida", "country": "USA", "league": "NHL"},
             {"name": "Toronto Maple Leafs", "display_name": "Toronto Maple Leafs", "city": "Toronto", "state": "Ontario", "country": "Canada", "league": "NHL"},
-            
+
             # NHL Teams - Eastern Conference Metropolitan Division
             {"name": "Carolina Hurricanes", "display_name": "Carolina Hurricanes", "city": "Raleigh", "state": "North Carolina", "country": "USA", "league": "NHL"},
             {"name": "Columbus Blue Jackets", "display_name": "Columbus Blue Jackets", "city": "Columbus", "state": "Ohio", "country": "USA", "league": "NHL"},
@@ -182,7 +180,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Philadelphia Flyers", "display_name": "Philadelphia Flyers", "city": "Philadelphia", "state": "Pennsylvania", "country": "USA", "league": "NHL"},
             {"name": "Pittsburgh Penguins", "display_name": "Pittsburgh Penguins", "city": "Pittsburgh", "state": "Pennsylvania", "country": "USA", "league": "NHL"},
             {"name": "Washington Capitals", "display_name": "Washington Capitals", "city": "Washington", "state": "D.C.", "country": "USA", "league": "NHL"},
-            
+
             # NHL Teams - Western Conference Central Division
             {"name": "Chicago Blackhawks", "display_name": "Chicago Blackhawks", "city": "Chicago", "state": "Illinois", "country": "USA", "league": "NHL"},
             {"name": "Colorado Avalanche", "display_name": "Colorado Avalanche", "city": "Denver", "state": "Colorado", "country": "USA", "league": "NHL"},
@@ -192,7 +190,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "St. Louis Blues", "display_name": "St. Louis Blues", "city": "St. Louis", "state": "Missouri", "country": "USA", "league": "NHL"},
             {"name": "Utah Hockey Club", "display_name": "Utah Hockey Club", "city": "Salt Lake City", "state": "Utah", "country": "USA", "league": "NHL"},
             {"name": "Winnipeg Jets", "display_name": "Winnipeg Jets", "city": "Winnipeg", "state": "Manitoba", "country": "Canada", "league": "NHL"},
-            
+
             # NHL Teams - Western Conference Pacific Division
             {"name": "Anaheim Ducks", "display_name": "Anaheim Ducks", "city": "Anaheim", "state": "California", "country": "USA", "league": "NHL"},
             {"name": "Calgary Flames", "display_name": "Calgary Flames", "city": "Calgary", "state": "Alberta", "country": "Canada", "league": "NHL"},
@@ -230,7 +228,7 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Tottenham Hotspur", "display_name": "Tottenham Hotspur FC", "city": "London", "country": "England", "league": "Premier League"},
             {"name": "West Ham United", "display_name": "West Ham United FC", "city": "London", "country": "England", "league": "Premier League"},
             {"name": "Wolverhampton Wanderers", "display_name": "Wolverhampton Wanderers FC", "city": "Wolverhampton", "country": "England", "league": "Premier League"},
-            
+
             # La Liga (Spain)
             {"name": "Athletic Bilbao", "display_name": "Athletic Club", "city": "Bilbao", "country": "Spain", "league": "La Liga"},
             {"name": "Atletico Madrid", "display_name": "Club Atletico de Madrid", "city": "Madrid", "country": "Spain", "league": "La Liga"},
@@ -239,21 +237,21 @@ COMPREHENSIVE_SPORTS_DATA = [
             {"name": "Sevilla", "display_name": "Sevilla FC", "city": "Seville", "country": "Spain", "league": "La Liga"},
             {"name": "Valencia", "display_name": "Valencia CF", "city": "Valencia", "country": "Spain", "league": "La Liga"},
             {"name": "Villarreal", "display_name": "Villarreal CF", "city": "Villarreal", "country": "Spain", "league": "La Liga"},
-            
+
             # Bundesliga (Germany)
             {"name": "Bayern Munich", "display_name": "FC Bayern Munich", "city": "Munich", "country": "Germany", "league": "Bundesliga"},
             {"name": "Borussia Dortmund", "display_name": "Borussia Dortmund", "city": "Dortmund", "country": "Germany", "league": "Bundesliga"},
             {"name": "RB Leipzig", "display_name": "RB Leipzig", "city": "Leipzig", "country": "Germany", "league": "Bundesliga"},
             {"name": "Bayer Leverkusen", "display_name": "Bayer 04 Leverkusen", "city": "Leverkusen", "country": "Germany", "league": "Bundesliga"},
             {"name": "Eintracht Frankfurt", "display_name": "Eintracht Frankfurt", "city": "Frankfurt", "country": "Germany", "league": "Bundesliga"},
-            
+
             # Serie A (Italy)
             {"name": "AC Milan", "display_name": "AC Milan", "city": "Milan", "country": "Italy", "league": "Serie A"},
             {"name": "Inter Milan", "display_name": "FC Internazionale Milano", "city": "Milan", "country": "Italy", "league": "Serie A"},
             {"name": "Juventus", "display_name": "Juventus FC", "city": "Turin", "country": "Italy", "league": "Serie A"},
             {"name": "AS Roma", "display_name": "AS Roma", "city": "Rome", "country": "Italy", "league": "Serie A"},
             {"name": "Napoli", "display_name": "SSC Napoli", "city": "Naples", "country": "Italy", "league": "Serie A"},
-            
+
             # Major League Soccer (USA and Canada)
             {"name": "Atlanta United FC", "display_name": "Atlanta United FC", "city": "Atlanta", "state": "Georgia", "country": "USA", "league": "MLS"},
             {"name": "Austin FC", "display_name": "Austin FC", "city": "Austin", "state": "Texas", "country": "USA", "league": "MLS"},
@@ -293,7 +291,7 @@ async def seed_comprehensive_teams_data():
     """Seed the database with comprehensive sports and teams data."""
     settings = Settings()
     db_manager = DatabaseManager(settings.database.url)
-    
+
     try:
         async with db_manager.transaction() as session:
             # Clear existing data
@@ -304,11 +302,11 @@ async def seed_comprehensive_teams_data():
             await session.execute(text("DELETE FROM teams"))
             await session.execute(text("DELETE FROM sports"))
             await session.commit()
-            
+
             # Seed sports and teams
             for sport_data in COMPREHENSIVE_SPORTS_DATA:
                 logger.info(f"Seeding sport: {sport_data['name']}")
-                
+
                 # Create sport
                 sport = Sport(
                     name=sport_data["name"],
@@ -318,7 +316,7 @@ async def seed_comprehensive_teams_data():
                 )
                 session.add(sport)
                 await session.flush()  # Get the sport ID
-                
+
                 # Create teams for this sport
                 team_count = 0
                 for team_data in sport_data["teams"]:
@@ -334,17 +332,17 @@ async def seed_comprehensive_teams_data():
                     )
                     session.add(team)
                     team_count += 1
-                
+
                 logger.info(f"Added {team_count} teams for {sport_data['name']}")
-            
+
             await session.commit()
             logger.info("Comprehensive sports and teams data seeded successfully!")
-            
+
             # Log summary
             total_sports = len(COMPREHENSIVE_SPORTS_DATA)
             total_teams = sum(len(sport["teams"]) for sport in COMPREHENSIVE_SPORTS_DATA)
             logger.info(f"Summary: {total_sports} sports, {total_teams} teams added to database")
-            
+
     except Exception as e:
         logger.error(f"Error seeding comprehensive sports data: {e}")
         raise
@@ -353,8 +351,6 @@ async def seed_comprehensive_teams_data():
 
 
 if __name__ == "__main__":
-    import uuid
-    from uuid import uuid4
-    
+
     logging.basicConfig(level=logging.INFO)
     asyncio.run(seed_comprehensive_teams_data())

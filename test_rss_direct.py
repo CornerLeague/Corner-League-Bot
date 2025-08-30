@@ -4,18 +4,19 @@ Direct test of RSS feed parsing without the full crawler infrastructure.
 """
 
 import asyncio
+import logging
+
 import aiohttp
 import feedparser
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def test_rss_direct():
     """Test RSS feed parsing directly"""
-    
+
     rss_url = "https://www.espn.com/espn/rss/news"
-    
+
     async with aiohttp.ClientSession() as session:
         try:
             logger.info(f"Fetching RSS feed: {rss_url}")
@@ -23,13 +24,13 @@ async def test_rss_direct():
                 if response.status == 200:
                     content = await response.text()
                     logger.info(f"RSS content length: {len(content)} characters")
-                    
+
                     # Parse with feedparser
                     feed = feedparser.parse(content)
-                    
+
                     logger.info(f"Feed title: {getattr(feed.feed, 'title', 'No title')}")
                     logger.info(f"Number of entries: {len(feed.entries)}")
-                    
+
                     if feed.entries:
                         for i, entry in enumerate(feed.entries[:3]):
                             logger.info(f"Entry {i+1}: {getattr(entry, 'title', 'No title')}")

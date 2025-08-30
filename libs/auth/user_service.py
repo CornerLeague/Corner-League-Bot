@@ -5,16 +5,13 @@ user preferences handling, and profile synchronization.
 """
 
 import logging
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.orm import selectinload
 
 from .clerk_config import get_clerk_config
-from ..common.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,32 +19,32 @@ logger = logging.getLogger(__name__)
 class UserProfile(BaseModel):
     """User profile model."""
     user_id: str
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    profile_image_url: Optional[str] = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+    profile_image_url: str | None = None
     created_at: datetime
     updated_at: datetime
-    last_sign_in_at: Optional[datetime] = None
-    
+    last_sign_in_at: datetime | None = None
+
     # User preferences
-    favorite_teams: List[str] = Field(default_factory=list)
-    favorite_sports: List[str] = Field(default_factory=list)
-    content_preferences: Dict[str, Any] = Field(default_factory=dict)
-    notification_settings: Dict[str, bool] = Field(default_factory=dict)
-    
+    favorite_teams: list[str] = Field(default_factory=list)
+    favorite_sports: list[str] = Field(default_factory=list)
+    content_preferences: dict[str, Any] = Field(default_factory=dict)
+    notification_settings: dict[str, bool] = Field(default_factory=dict)
+
     # User roles and permissions
-    roles: List[str] = Field(default_factory=list)
+    roles: list[str] = Field(default_factory=list)
     is_active: bool = True
     is_verified: bool = False
 
 
 class UserPreferences(BaseModel):
     """User preferences model."""
-    favorite_teams: List[str] = Field(default_factory=list)
-    favorite_sports: List[str] = Field(default_factory=list)
-    content_types: List[str] = Field(default_factory=list)  # news, analysis, highlights, etc.
+    favorite_teams: list[str] = Field(default_factory=list)
+    favorite_sports: list[str] = Field(default_factory=list)
+    content_types: list[str] = Field(default_factory=list)  # news, analysis, highlights, etc.
     notification_email: bool = True
     notification_push: bool = True
     notification_frequency: str = "daily"  # immediate, daily, weekly
@@ -62,13 +59,13 @@ class UserActivity(BaseModel):
     action: str  # view, like, share, save, etc.
     resource_type: str  # article, video, etc.
     resource_id: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime
 
 
 class ClerkAPIClient:
     """Client for interacting with Clerk's API."""
-    
+
     def __init__(self):
         self.config = get_clerk_config()
         self.base_url = "https://api.clerk.dev/v1"
@@ -80,8 +77,8 @@ class ClerkAPIClient:
             },
             timeout=30.0
         )
-    
-    async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+
+    async def get_user(self, user_id: str) -> dict[str, Any] | None:
         """Get user information from Clerk.
         
         Args:
@@ -102,12 +99,12 @@ class ClerkAPIClient:
         except httpx.HTTPError as e:
             logger.error(f"Failed to fetch user from Clerk: {e}")
             return None
-    
+
     async def update_user_metadata(
         self,
         user_id: str,
-        public_metadata: Optional[Dict[str, Any]] = None,
-        private_metadata: Optional[Dict[str, Any]] = None
+        public_metadata: dict[str, Any] | None = None,
+        private_metadata: dict[str, Any] | None = None
     ) -> bool:
         """Update user metadata in Clerk.
         
@@ -125,24 +122,24 @@ class ClerkAPIClient:
                 payload["public_metadata"] = public_metadata
             if private_metadata is not None:
                 payload["private_metadata"] = private_metadata
-            
+
             if not payload:
                 return True
-            
+
             response = await self.client.patch(f"/users/{user_id}", json=payload)
             response.raise_for_status()
             return True
-            
+
         except httpx.HTTPError as e:
             logger.error(f"Failed to update user metadata in Clerk: {e}")
             return False
-    
+
     async def get_user_list(
         self,
         limit: int = 10,
         offset: int = 0,
-        email_address: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        email_address: str | None = None
+    ) -> list[dict[str, Any]]:
         """Get a list of users from Clerk.
         
         Args:
@@ -157,15 +154,15 @@ class ClerkAPIClient:
             params = {"limit": limit, "offset": offset}
             if email_address:
                 params["email_address"] = email_address
-            
+
             response = await self.client.get("/users", params=params)
             response.raise_for_status()
             return response.json()
-            
+
         except httpx.HTTPError as e:
             logger.error(f"Failed to fetch user list from Clerk: {e}")
             return []
-    
+
     async def close(self):
         """Close the HTTP client."""
         await self.client.aclose()
@@ -177,7 +174,7 @@ class UserService:
     def __init__(self):
         self.clerk_client = ClerkAPIClient()
 
-    def _clerk_user_to_profile(self, clerk_user: Dict[str, Any]) -> UserProfile:
+    def _clerk_user_to_profile(self, clerk_user: dict[str, Any]) -> UserProfile:
         """Convert Clerk user data to internal UserProfile model."""
         try:
             return UserProfile(
@@ -205,12 +202,12 @@ class UserService:
         except Exception as e:
             logger.error(f"Error mapping Clerk user to UserProfile: {e}")
             raise
-    
+
     async def get_or_create_user_profile(
         self,
         user_id: str,
         sync_with_clerk: bool = True
-    ) -> Optional[UserProfile]:
+    ) -> UserProfile | None:
         """Get or create a user profile.
         
         Args:
@@ -241,7 +238,7 @@ class UserService:
         self,
         user_id: str,
         sync_with_clerk: bool = True
-    ) -> Optional[UserProfile]:
+    ) -> UserProfile | None:
         """Retrieve a user profile without creating it.
 
         Args:
@@ -297,11 +294,11 @@ class UserService:
 
     async def list_users(
         self, limit: int = 100, offset: int = 0
-    ) -> List[UserProfile]:
+    ) -> list[UserProfile]:
         """List users via Clerk."""
         try:
             users = await self.clerk_client.get_user_list(limit=limit, offset=offset)
-            profiles: List[UserProfile] = []
+            profiles: list[UserProfile] = []
             for user in users:
                 try:
                     profiles.append(self._clerk_user_to_profile(user))
@@ -311,7 +308,7 @@ class UserService:
         except Exception as e:
             logger.error(f"Failed to list users: {e}")
             return []
-    
+
     async def update_user_preferences(
         self,
         user_id: str,
@@ -329,20 +326,20 @@ class UserService:
         try:
             # Update in local database
             # (Implementation depends on your database schema)
-            
+
             # Optionally sync with Clerk metadata
             await self.clerk_client.update_user_metadata(
                 user_id,
                 public_metadata={"preferences": preferences.dict()}
             )
-            
+
             logger.info(f"Updated preferences for user: {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to update user preferences: {e}")
             return False
-    
+
     async def get_user_preferences(self, user_id: str) -> UserPreferences:
         """Get user preferences.
         
@@ -355,21 +352,21 @@ class UserService:
         try:
             # Get from local database first
             # (Implementation depends on your database schema)
-            
+
             # Fallback to default preferences
             return UserPreferences()
-            
+
         except Exception as e:
             logger.error(f"Failed to get user preferences: {e}")
             return UserPreferences()
-    
+
     async def track_user_activity(
         self,
         user_id: str,
         action: str,
         resource_type: str,
         resource_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None
     ) -> bool:
         """Track user activity.
         
@@ -392,23 +389,23 @@ class UserService:
                 metadata=metadata or {},
                 timestamp=datetime.utcnow()
             )
-            
+
             # Store in database
             # (Implementation depends on your database schema)
-            
+
             logger.debug(f"Tracked activity for user {user_id}: {action} on {resource_type}:{resource_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to track user activity: {e}")
             return False
-    
+
     async def get_user_activity(
         self,
         user_id: str,
         limit: int = 50,
-        action_filter: Optional[str] = None
-    ) -> List[UserActivity]:
+        action_filter: str | None = None
+    ) -> list[UserActivity]:
         """Get user activity history.
         
         Args:
@@ -422,13 +419,13 @@ class UserService:
         try:
             # Get from database
             # (Implementation depends on your database schema)
-            
+
             return []
-            
+
         except Exception as e:
             logger.error(f"Failed to get user activity: {e}")
             return []
-    
+
     async def delete_user_data(self, user_id: str) -> bool:
         """Delete all user data (GDPR compliance).
         
@@ -441,15 +438,15 @@ class UserService:
         try:
             # Delete from local database
             # (Implementation depends on your database schema)
-            
+
             logger.info(f"Deleted user data for: {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to delete user data: {e}")
             return False
-    
-    async def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+
+    async def get_user_stats(self, user_id: str) -> dict[str, Any]:
         """Get user statistics.
         
         Args:
@@ -461,7 +458,7 @@ class UserService:
         try:
             # Calculate stats from database
             # (Implementation depends on your database schema)
-            
+
             return {
                 "articles_read": 0,
                 "articles_saved": 0,
@@ -470,18 +467,18 @@ class UserService:
                 "favorite_topics": [],
                 "activity_streak": 0
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to get user stats: {e}")
             return {}
-    
+
     async def close(self):
         """Close external connections."""
         await self.clerk_client.close()
 
 
 # Global service instance
-_user_service: Optional[UserService] = None
+_user_service: UserService | None = None
 
 
 def get_user_service() -> UserService:
