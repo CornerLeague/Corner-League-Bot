@@ -21,6 +21,16 @@ from trafilatura import extract
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "URLCanonicalizer",
+    "CanonicalURLExtractor",
+    "ContentHasher",
+    "NearDuplicateDetector",
+    "DuplicateDetector",
+    "ContentExtractor",
+    "ExtractionPipeline",
+]
+
 
 class URLCanonicalizer:
     """Canonicalizes URLs for deduplication"""
@@ -126,6 +136,12 @@ class URLCanonicalizer:
             logger.warning(f"Failed to extract canonical URL from HTML: {e}")
 
         return None
+
+
+class CanonicalURLExtractor(URLCanonicalizer):
+    """Backward-compatible alias for URLCanonicalizer."""
+
+    pass
 
 
 class ContentHasher:
@@ -279,12 +295,41 @@ class NearDuplicateDetector:
                     pass  # Ignore errors during cleanup
 
 
-class ContentExtractor:
-    """Extracts and processes content from HTML"""
+class DuplicateDetector(NearDuplicateDetector):
+    """Backward-compatible alias for :class:`NearDuplicateDetector`.
 
-    def __init__(self):
-        self.canonicalizer = URLCanonicalizer()
+    The original implementation accepted a Redis client as the first
+    positional argument. To maintain drop-in compatibility while using
+    the newer ``NearDuplicateDetector`` implementation, this class
+    ignores the optional Redis client argument and forwards any
+    remaining parameters to ``NearDuplicateDetector``.
+    """
+
+    def __init__(self, _redis_client=None, *args, **kwargs):  # noqa: D401 - see class docstring
+        super().__init__(*args, **kwargs)
+
+
+class ContentExtractor:
+    """Extracts and processes content from HTML."""
+
+    def __init__(
+        self,
+        _settings: Any | None = None,
+        canonical_extractor: URLCanonicalizer | None = None,
+        duplicate_detector: NearDuplicateDetector | None = None,
+    ):
+        """Create a new :class:`ContentExtractor`.
+
+        Previous versions required a ``settings`` object, a canonical URL
+        extractor and an optional duplicate detector. These parameters are
+        accepted for backward compatibility but are not required by the
+        current implementation.
+        """
+
+        self.settings = _settings
+        self.canonicalizer = canonical_extractor or URLCanonicalizer()
         self.hasher = ContentHasher()
+        self.duplicate_detector = duplicate_detector
 
         # Sports-specific keywords for relevance detection
         self.sports_keywords = {
