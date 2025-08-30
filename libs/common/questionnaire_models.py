@@ -9,6 +9,7 @@ keep concerns modular while still sharing the same SQLAlchemy ``Base``.
 """
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -42,7 +43,7 @@ class Sport(Base):
 
     __tablename__ = "sports"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(50), unique=True, nullable=False)
     display_name = Column(String(100), nullable=False)
     description = Column(Text)
@@ -58,8 +59,8 @@ class Team(Base):
 
     __tablename__ = "teams"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    sport_id = Column(Integer, ForeignKey("sports.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    sport_id = Column(UUID(as_uuid=True), ForeignKey("sports.id"), nullable=False)
     name = Column(String(100), nullable=False)
     display_name = Column(String(100), nullable=False)
     city = Column(String(100))
@@ -81,7 +82,7 @@ class UserSportPreference(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(255), nullable=False, index=True)
-    sport_id = Column(Integer, ForeignKey("sports.id"), nullable=False, index=True)
+    sport_id = Column(UUID(as_uuid=True), ForeignKey("sports.id"), nullable=False, index=True)
     interest_level = Column(Integer, nullable=False)
     preference_order = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=func.now())
@@ -97,7 +98,7 @@ class UserTeamPreference(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(255), nullable=False, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=False, index=True)
     interest_level = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=func.now())
 

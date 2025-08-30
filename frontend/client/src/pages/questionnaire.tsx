@@ -32,7 +32,7 @@ import {
 } from '@/hooks/useQuestionnaire';
 
 interface Sport {
-  id: number;
+  id: string;
   name: string;
   display_name: string;
   description: string;
@@ -67,8 +67,8 @@ export default function QuestionnairePage() {
   const [error, setError] = useState<string | null>(null);
   
   // User selections
-  const [selectedSports, setSelectedSports] = useState<number[]>([]);
-  const [rankedSports, setRankedSports] = useState<number[]>([]);
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [rankedSports, setRankedSports] = useState<string[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<{team_id: string, sport_id: string}[]>([]);
   
   // API hooks
@@ -121,20 +121,22 @@ export default function QuestionnairePage() {
       setSubmitting(true);
       setError(null);
       
-      // Convert selected sports to preference format with default interest level of 3 (moderate)
-      const sportPreferences = selectedSports.map((sportId) => ({
-        sport_id: Number(sportId),
+      // Filter out any null/undefined values and convert selected sports to preference format
+      const validSportIds = selectedSports.filter(sportId => sportId != null && sportId !== '');
+      const sportPreferences = validSportIds.map((sportId) => ({
+        sport_id: sportId,
         interest_level: 3,
       }));
       
       console.log('DEBUG: selectedSports array:', selectedSports);
+      console.log('DEBUG: validSportIds array:', validSportIds);
       console.log('DEBUG: selectedSports types:', selectedSports.map(id => typeof id));
       console.log('DEBUG: sportPreferences payload:', JSON.stringify(sportPreferences, null, 2));
       await saveSportPreferences.mutateAsync(sportPreferences);
       
       // If user selected multiple sports, go to ranking step
-      if (Array.isArray(selectedSports) && selectedSports.length > 1) {
-        setRankedSports([...selectedSports]);
+      if (Array.isArray(validSportIds) && validSportIds.length > 1) {
+        setRankedSports([...validSportIds]);
         setCurrentStep('sports_ranking');
       } else {
         // Single sport selected, skip ranking and go to teams
@@ -186,7 +188,7 @@ export default function QuestionnairePage() {
     }
   };
 
-  const toggleSportSelection = (sportId: number) => {
+  const toggleSportSelection = (sportId: string) => {
     setSelectedSports(prev => 
       prev.includes(sportId) 
         ? prev.filter(id => id !== sportId)
@@ -398,7 +400,7 @@ export default function QuestionnairePage() {
         
         {Object.entries(teamsBySport).map(([sportId, sportTeams]) => {
           const typedSportTeams = sportTeams as Team[];
-          const sport = sports.find(s => s.id === parseInt(sportId));
+          const sport = sports.find(s => s.id === sportId);
           const selectedTeamForSport = selectedTeams.find(t => t.sport_id === sportId);
           
           return (

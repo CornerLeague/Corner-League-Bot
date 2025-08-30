@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 
 interface Sport {
-  id: number;
+  id: string;
   name: string;
   display_name: string;
   description: string;
@@ -57,7 +57,7 @@ interface UserPreferences {
 }
 
 interface SportPreferenceRequest {
-  sport_id: number;
+  sport_id: string;
   interest_level: number;
 }
 
@@ -219,19 +219,24 @@ export function useSaveSportPreferences() {
       if (!response.ok) {
         let errorMessage = 'Failed to save sport preferences';
         try {
-          const error = await response.json();
-          console.error('DEBUG: Full error response:', JSON.stringify(error, null, 2));
+          const errorResponse = await response.json();
+          console.error('DEBUG: Full error response:', JSON.stringify(errorResponse, null, 2));
           console.error('DEBUG: Response status:', response.status);
           console.error('DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
-          console.error('DEBUG: Error type:', typeof error);
-          console.error('DEBUG: Error detail:', error.detail);
+          console.error('DEBUG: Error type:', typeof errorResponse);
+          
+          // Handle backend error format: {ok: false, error: {message: string, details: array}}
+          const error = errorResponse.error || errorResponse;
+          console.error('DEBUG: Error detail:', error.details || error.detail);
           console.error('DEBUG: Error message:', error.message);
-          if (Array.isArray(error.detail)) {
-            errorMessage = error.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
-          } else if (typeof error.detail === 'object' && error.detail !== null) {
-            errorMessage = JSON.stringify(error.detail);
+          
+          const errorDetail = error.details || error.detail;
+          if (Array.isArray(errorDetail)) {
+            errorMessage = errorDetail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+          } else if (typeof errorDetail === 'object' && errorDetail !== null) {
+            errorMessage = JSON.stringify(errorDetail);
           } else {
-            errorMessage = error.detail || error.message || errorMessage;
+            errorMessage = errorDetail || error.message || errorMessage;
           }
         } catch (parseError) {
           console.error('DEBUG: Failed to parse error response:', parseError);
@@ -280,19 +285,24 @@ export function useSaveSportRankings() {
       if (!response.ok) {
         let errorMessage = 'Failed to save sport rankings';
         try {
-          const error = await response.json();
-          console.error('DEBUG: Sport rankings error response:', JSON.stringify(error, null, 2));
+          const errorResponse = await response.json();
+          console.error('DEBUG: Sport rankings error response:', JSON.stringify(errorResponse, null, 2));
           console.error('DEBUG: Sport rankings response status:', response.status);
           console.error('DEBUG: Sport rankings response headers:', Object.fromEntries(response.headers.entries()));
-          console.error('DEBUG: Sport rankings error type:', typeof error);
-          console.error('DEBUG: Sport rankings error detail:', error.detail);
+          console.error('DEBUG: Sport rankings error type:', typeof errorResponse);
+          
+          // Handle backend error format: {ok: false, error: {message: string, details: array}}
+          const error = errorResponse.error || errorResponse;
+          console.error('DEBUG: Sport rankings error detail:', error.details || error.detail);
           console.error('DEBUG: Sport rankings error message:', error.message);
-          if (Array.isArray(error.detail)) {
-            errorMessage = error.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
-          } else if (typeof error.detail === 'object' && error.detail !== null) {
-            errorMessage = JSON.stringify(error.detail);
+          
+          const errorDetail = error.details || error.detail;
+          if (Array.isArray(errorDetail)) {
+            errorMessage = errorDetail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+          } else if (typeof errorDetail === 'object' && errorDetail !== null) {
+            errorMessage = JSON.stringify(errorDetail);
           } else {
-            errorMessage = error.detail || error.message || errorMessage;
+            errorMessage = errorDetail || error.message || errorMessage;
           }
         } catch (parseError) {
           console.error('DEBUG: Failed to parse sport rankings error response:', parseError);
@@ -340,8 +350,11 @@ export function useSaveTeamPreferences() {
       if (!response.ok) {
         let errorMessage = 'Failed to save team preferences';
         try {
-          const error = await response.json();
-          errorMessage = error.detail || error.message || errorMessage;
+          const errorResponse = await response.json();
+          // Handle backend error format: {ok: false, error: {message: string, details: array}}
+          const error = errorResponse.error || errorResponse;
+          const errorDetail = error.details || error.detail;
+          errorMessage = errorDetail || error.message || errorMessage;
         } catch {
           // If response is not JSON (e.g., HTML error page), use status text
           errorMessage = `${response.status} ${response.statusText}`;
@@ -368,7 +381,7 @@ export function useSaveTeamPreferences() {
 /**
  * Utility hook to get teams for multiple sports
  */
-export function useTeamsForSports(sportIds: number[]) {
+export function useTeamsForSports(sportIds: string[]) {
   const { getToken } = useAuth();
   
   // Convert sportIds to strings for API calls

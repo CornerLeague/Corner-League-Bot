@@ -20,17 +20,17 @@ router = APIRouter()
 
 # Response Models
 class SportResponse(BaseModel):
-    id: int
+    id: str
     name: str
     display_name: str
     description: str | None
     is_active: bool
 
 class TeamResponse(BaseModel):
-    id: int
+    id: str
     name: str
     display_name: str
-    sport_id: int
+    sport_id: str
     sport_name: str | None
     city: str | None
     state: str | None
@@ -41,7 +41,7 @@ class TeamResponse(BaseModel):
 class UserSportPreferenceResponse(BaseModel):
     id: int
     user_id: str
-    sport_id: int
+    sport_id: str
     sport_name: str | None
     interest_level: int
     created_at: str | None
@@ -49,7 +49,7 @@ class UserSportPreferenceResponse(BaseModel):
 class UserTeamPreferenceResponse(BaseModel):
     id: int
     user_id: str
-    team_id: int
+    team_id: str
     team_name: str | None
     sport_name: str | None
     interest_level: int
@@ -65,11 +65,11 @@ class QuestionnaireStatusResponse(BaseModel):
 
 # Request Models
 class SportPreferenceRequest(BaseModel):
-    sport_id: int
+    sport_id: str
     interest_level: int
 
 class TeamPreferenceRequest(BaseModel):
-    team_id: int
+    team_id: str
     interest_level: int
 
 class SportRankingRequest(BaseModel):
@@ -160,7 +160,7 @@ async def get_available_sports(db: AsyncSession = Depends(get_db)):
 
 @router.get("/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport(
-    sport_id: int = Query(..., description="Sport ID to filter teams"),
+    sport_id: str = Query(..., description="Sport ID to filter teams"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get teams for a specific sport."""
@@ -195,7 +195,7 @@ async def get_teams_by_sport(
 
 @router.get("/sports/{sport_id}/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport_path(
-    sport_id: int,
+    sport_id: str,
     db: AsyncSession = Depends(get_db)
 ):
     """Get teams for a specific sport (path parameter version)."""

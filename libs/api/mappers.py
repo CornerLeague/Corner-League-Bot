@@ -42,7 +42,7 @@ def map_user_team_preference_to_response(preference: UserTeamPreference) -> dict
 def map_sport_to_response(sport: Sport) -> dict:
     """Convert Sport model to API response format."""
     return {
-        "id": sport.id,
+        "id": str(sport.id),
         "name": sport.name,
         "display_name": sport.display_name,
         "description": sport.description,
@@ -52,10 +52,10 @@ def map_sport_to_response(sport: Sport) -> dict:
 def map_team_to_response(team: Team) -> dict:
     """Convert Team model to API response format."""
     return {
-        "id": team.id,
+        "id": str(team.id),
         "name": team.name,
         "display_name": team.display_name,
-        "sport_id": team.sport_id,
+        "sport_id": str(team.sport_id),
         "sport_name": team.sport.name if team.sport else None,
         "city": team.city,
         "state": team.state,
