@@ -45,9 +45,12 @@ class Sport(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(50), unique=True, nullable=False)
+    slug = Column(String(50), unique=True, nullable=False)
     display_name = Column(String(100), nullable=False)
     description = Column(Text)
     is_active = Column(Boolean, default=True)
+    has_teams = Column(Boolean, default=True)
+    display_order = Column(Integer, default=0)
     created_at = Column(DateTime, default=func.now())
 
     # Relationships
@@ -62,6 +65,7 @@ class Team(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     sport_id = Column(UUID(as_uuid=True), ForeignKey("sports.id"), nullable=False)
     name = Column(String(100), nullable=False)
+    slug = Column(String(100), unique=True, nullable=False)
     display_name = Column(String(100), nullable=False)
     city = Column(String(100))
     state = Column(String(100))
