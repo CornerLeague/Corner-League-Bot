@@ -119,4 +119,3 @@ __all__ = [
     "FavoriteTeamsRequest",
     "UserQuestionnaireStatus",
 ]
-

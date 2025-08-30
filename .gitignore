@@ -212,3 +212,4 @@ development_todo_list.md
 *.md
 !README.md
 !clerk_auth_implementation_plan.md
+!.pre-commit-config.yaml
