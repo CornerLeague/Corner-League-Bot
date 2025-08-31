@@ -70,6 +70,10 @@ interface TeamPreferenceRequest {
   interest_level: number;
 }
 
+interface FavoriteTeamsRequest {
+  team_selections: TeamPreferenceRequest[];
+}
+
 // Use relative API path - Vite proxy will redirect to backend
 const API_BASE = '/api/questionnaire';
 
@@ -205,7 +209,7 @@ export function useSaveSportPreferences() {
   return useMutation({
     mutationFn: async (data: SportPreferenceRequest[]) => {
       const token = await getToken();
-      const response = await fetch(`${API_BASE}/sports/preferences`, {
+      const response = await fetch(`${API_BASE}/sports/preferences-v2`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -334,7 +338,7 @@ export function useSaveTeamPreferences() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: TeamPreferenceRequest[]) => {
+    mutationFn: async (data: FavoriteTeamsRequest) => {
       const token = await getToken();
       const response = await fetch(`${API_BASE}/teams/preferences`, {
         method: 'POST',
@@ -349,11 +353,24 @@ export function useSaveTeamPreferences() {
         let errorMessage = 'Failed to save team preferences';
         try {
           const errorResponse = await response.json();
+          console.log('DEBUG: Full error response:', errorResponse);
           // Handle backend error format: {ok: false, error: {message: string, details: array}}
           const error = errorResponse.error || errorResponse;
           const errorDetail = error.details || error.detail;
-          errorMessage = errorDetail || error.message || errorMessage;
-        } catch {
+          console.log('DEBUG: Error detail extracted:', errorDetail);
+
+          // Handle validation errors (array of ValidationError objects)
+          if (Array.isArray(errorDetail)) {
+            const validationMessages = errorDetail.map((err: any) => {
+              const location = Array.isArray(err.loc) ? err.loc.join('.') : 'unknown';
+              return `${location}: ${err.msg}`;
+            });
+            errorMessage = validationMessages.join('; ');
+          } else {
+            errorMessage = errorDetail || error.message || errorMessage;
+          }
+        } catch (parseError) {
+          console.log('DEBUG: Failed to parse error response:', parseError);
           // If response is not JSON (e.g., HTML error page), use status text
           errorMessage = `${response.status} ${response.statusText}`;
         }
@@ -412,7 +429,7 @@ export function useTeamsForSports(sportIds: string[]) {
         }
 
         const data = await response.json();
-        return data.teams || [];
+        return data.data || [];
       });
 
       const teamsArrays = await Promise.all(teamPromises);

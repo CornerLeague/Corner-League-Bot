@@ -74,7 +74,13 @@ export default function QuestionnairePage() {
   // API hooks
   const { data: questionnaireStatus, isLoading: statusLoading } = useQuestionnaireStatus();
   const { data: sportsData, isLoading: sportsLoading, error: sportsError } = useAvailableSports();
-  const teamsQuery = useTeamsForSports(Array.isArray(selectedSports) && selectedSports.length > 0 ? selectedSports : []);
+  // Use rankedSports if available (after ranking step), otherwise use selectedSports
+  const sportsForTeams = rankedSports.length > 0 ? rankedSports : selectedSports;
+  console.log('DEBUG: sportsForTeams:', sportsForTeams);
+  console.log('DEBUG: rankedSports:', rankedSports);
+  console.log('DEBUG: selectedSports:', selectedSports);
+  console.log('DEBUG: currentStep:', currentStep);
+  const teamsQuery = useTeamsForSports(Array.isArray(sportsForTeams) && sportsForTeams.length > 0 ? sportsForTeams : []);
   const saveSportPreferences = useSaveSportPreferences();
   const saveSportRankings = useSaveSportRankings();
   const saveTeamPreferences = useSaveTeamPreferences();
@@ -83,6 +89,11 @@ export default function QuestionnairePage() {
   const sports = sportsData?.sports || [];
   const teams = teamsQuery.data?.teams || [];
   const status = questionnaireStatus;
+
+  console.log('DEBUG: teamsQuery.isLoading:', teamsQuery.isLoading);
+  console.log('DEBUG: teamsQuery.error:', teamsQuery.error);
+  console.log('DEBUG: teamsQuery.data:', teamsQuery.data);
+  console.log('DEBUG: teams from query:', teams);
 
 
 
@@ -185,7 +196,7 @@ export default function QuestionnairePage() {
         team_id: team.team_id,
         interest_level: 3,
       }));
-      await saveTeamPreferences.mutateAsync(teamPreferences);
+      await saveTeamPreferences.mutateAsync({ team_selections: teamPreferences });
       setCurrentStep('completed');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save team preferences';
@@ -386,11 +397,15 @@ export default function QuestionnairePage() {
   );
 
   const renderTeamsSelection = () => {
+    console.log('DEBUG: teams data:', teams);
+    console.log('DEBUG: teams length:', teams.length);
     const teamsBySport = teams.reduce((acc, team) => {
       if (!acc[team.sport_id]) acc[team.sport_id] = [];
       acc[team.sport_id].push(team);
       return acc;
     }, {} as Record<string, Team[]>);
+    console.log('DEBUG: teamsBySport:', teamsBySport);
+    console.log('DEBUG: Object.entries(teamsBySport):', Object.entries(teamsBySport));
 
     const handleTeamSelect = (teamId: string, sportId: string) => {
       if (teamId && teamId !== 'none') {
@@ -405,6 +420,27 @@ export default function QuestionnairePage() {
           <h2 className="text-2xl font-bold mb-2">Choose Your Teams</h2>
           <p className="text-gray-600">Select your favorite teams from your chosen sports using the dropdown menus</p>
         </div>
+
+        {teamsQuery.isLoading && (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading teams...</span>
+          </div>
+        )}
+
+        {teamsQuery.error && (
+          <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Error loading teams: {teamsQuery.error.message}</span>
+          </div>
+        )}
+
+        {!teamsQuery.isLoading && !teamsQuery.error && Object.keys(teamsBySport).length === 0 && (
+          <div className="text-center p-8 text-gray-500">
+            <p>No teams available for the selected sports.</p>
+            <p className="text-sm mt-2">Debug: teams.length = {teams.length}, sportsForTeams = {JSON.stringify(sportsForTeams)}</p>
+          </div>
+        )}
 
         {Object.entries(teamsBySport).map(([sportId, sportTeams]) => {
           const typedSportTeams = sportTeams as Team[];

@@ -174,11 +174,41 @@ SPORTS_DATA = [
         ]
     },
     {
+        "name": "College Basketball",
+        "slug": "college-basketball",
+        "has_teams": True,
+        "description": "NCAA Division I men's and women's college basketball",
+        "display_order": 13,
+        "teams": [
+            # Major College Basketball Teams - will be populated with comprehensive data
+            {"name": "Duke Blue Devils", "slug": "duke", "city": "Durham", "abbreviation": "DUKE", "league": "NCAA", "conference": "ACC"},
+            {"name": "North Carolina Tar Heels", "slug": "unc", "city": "Chapel Hill", "abbreviation": "UNC", "league": "NCAA", "conference": "ACC"},
+            {"name": "Kentucky Wildcats", "slug": "kentucky", "city": "Lexington", "abbreviation": "UK", "league": "NCAA", "conference": "SEC"},
+            {"name": "Kansas Jayhawks", "slug": "kansas", "city": "Lawrence", "abbreviation": "KU", "league": "NCAA", "conference": "Big 12"},
+            {"name": "UCLA Bruins", "slug": "ucla", "city": "Los Angeles", "abbreviation": "UCLA", "league": "NCAA", "conference": "Pac-12"},
+        ]
+    },
+    {
+        "name": "College Football",
+        "slug": "college-football",
+        "has_teams": True,
+        "description": "NCAA Division I FBS college football",
+        "display_order": 14,
+        "teams": [
+            # Major College Football Teams - will be populated with comprehensive data
+            {"name": "Alabama Crimson Tide", "slug": "alabama", "city": "Tuscaloosa", "abbreviation": "ALA", "league": "NCAA", "conference": "SEC"},
+            {"name": "Georgia Bulldogs", "slug": "georgia", "city": "Athens", "abbreviation": "UGA", "league": "NCAA", "conference": "SEC"},
+            {"name": "Ohio State Buckeyes", "slug": "ohio-state", "city": "Columbus", "abbreviation": "OSU", "league": "NCAA", "conference": "Big Ten"},
+            {"name": "Michigan Wolverines", "slug": "michigan", "city": "Ann Arbor", "abbreviation": "MICH", "league": "NCAA", "conference": "Big Ten"},
+            {"name": "Texas Longhorns", "slug": "texas", "city": "Austin", "abbreviation": "TEX", "league": "NCAA", "conference": "Big 12"},
+        ]
+    },
+    {
         "name": "Olympics",
         "slug": "olympics",
         "has_teams": False,
         "description": "Summer and Winter Olympic Games coverage",
-        "display_order": 13,
+        "display_order": 15,
         "teams": []
     }
 ]
@@ -207,6 +237,7 @@ async def seed_sports_data():
             for sport_data in SPORTS_DATA:
                 sport = Sport(
                     name=sport_data["name"],
+                    slug=sport_data["slug"],
                     display_name=sport_data["name"],
                     description=sport_data.get("description"),
                     is_active=True
@@ -221,6 +252,7 @@ async def seed_sports_data():
                         team = Team(
                             sport_id=sport.id,
                             name=team_data["name"],
+                            slug=team_data["slug"],
                             display_name=team_data["name"],
                             city=team_data.get("city"),
                             league=team_data.get("league"),

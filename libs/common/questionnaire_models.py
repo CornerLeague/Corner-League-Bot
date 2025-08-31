@@ -92,11 +92,11 @@ class UserSportPreference(Base):
 
     __tablename__ = "user_sport_preferences"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id = Column(String(255), nullable=False, index=True)
     sport_id = Column(UUID(as_uuid=True), ForeignKey("sports.id"), nullable=False, index=True)
     interest_level = Column(Integer, nullable=False)
-    preference_order = Column(Integer, nullable=True)
+    preference_order = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=func.now())
 
     # Relationships
@@ -108,10 +108,11 @@ class UserTeamPreference(Base):
 
     __tablename__ = "user_team_preferences"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id = Column(String(255), nullable=False, index=True)
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=False, index=True)
     interest_level = Column(Integer, nullable=False)
+    preference_order = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=func.now())
 
     # Relationships

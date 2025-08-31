@@ -19,9 +19,9 @@ def map_user_profile_to_response(profile: UserProfile) -> dict:
 def map_user_sport_preference_to_response(preference: UserSportPreference) -> dict:
     """Convert UserSportPreference model to API response format."""
     return {
-        "id": preference.id,
+        "id": str(preference.id),
         "user_id": preference.user_id,
-        "sport_id": preference.sport_id,
+        "sport_id": str(preference.sport_id),
         "sport_name": preference.sport.name if preference.sport else None,
         "interest_level": preference.interest_level,
         "created_at": preference.created_at.isoformat() if preference.created_at else None
@@ -30,9 +30,9 @@ def map_user_sport_preference_to_response(preference: UserSportPreference) -> di
 def map_user_team_preference_to_response(preference: UserTeamPreference) -> dict:
     """Convert UserTeamPreference model to API response format."""
     return {
-        "id": preference.id,
+        "id": str(preference.id),
         "user_id": preference.user_id,
-        "team_id": preference.team_id,
+        "team_id": str(preference.team_id),
         "team_name": preference.team.name if preference.team else None,
         "sport_name": preference.team.sport.name if preference.team and preference.team.sport else None,
         "interest_level": preference.interest_level,

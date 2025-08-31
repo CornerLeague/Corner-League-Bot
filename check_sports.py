@@ -1,18 +1,19 @@
+#!/usr/bin/env python3
 import asyncio
-
-from sqlalchemy import select
-
-from libs.common.database import get_db_session
-from libs.common.questionnaire_models import Sport
-
+from libs.common.database import ConnectionPool
+from libs.common.config import Settings
 
 async def check_sports():
-    async with get_db_session() as db:
-        result = await db.execute(select(Sport))
-        sports = result.scalars().all()
-        print(f"Total sports: {len(sports)}")
-        for sport in sports:
-            print(f"- {sport.name} (active: {sport.is_active})")
+    settings = Settings()
+    db = ConnectionPool(settings.database.url)
+    await db.initialize()
+
+    sports = await db.fetch('SELECT id, name, slug, is_active FROM sports ORDER BY display_order')
+    print('Available sports:')
+    for sport in sports:
+        print(f'  ID: {sport["id"]}, Name: {sport["name"]}, Slug: {sport["slug"]}, Active: {sport["is_active"]}')
+
+    await db.close()
 
 if __name__ == "__main__":
     asyncio.run(check_sports())

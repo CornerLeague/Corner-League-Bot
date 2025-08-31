@@ -310,6 +310,7 @@ async def seed_comprehensive_teams_data():
                 # Create sport
                 sport = Sport(
                     name=sport_data["name"],
+                    slug=sport_data["name"].lower().replace(" ", "-").replace("/", "-"),
                     display_name=sport_data["display_name"],
                     description=sport_data["description"],
                     is_active=True
@@ -323,6 +324,7 @@ async def seed_comprehensive_teams_data():
                     team = Team(
                         sport_id=sport.id,
                         name=team_data["name"],
+                        slug=team_data["name"].lower().replace(" ", "-").replace("&", "and").replace(".", "").replace("'", ""),
                         display_name=team_data["display_name"],
                         city=team_data.get("city"),
                         state=team_data.get("state"),

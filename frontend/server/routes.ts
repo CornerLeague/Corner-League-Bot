@@ -30,10 +30,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[PROXY] Request headers:`, headers);
         console.log(`[PROXY] Request body:`, req.body);
 
-       // Prepare the body - send as parsed JSON object
-        let body: any;
+       // Prepare the body - send as JSON string
+        let body: string | undefined;
         if (req.method !== 'GET' && req.body) {
-          // req.body is already parsed by Express, send it as JSON string
+          // req.body is already parsed by Express, stringify it for fetch
           body = JSON.stringify(req.body);
           headers['Content-Type'] = 'application/json';
           console.log(`[PROXY] Request body:`, req.body);

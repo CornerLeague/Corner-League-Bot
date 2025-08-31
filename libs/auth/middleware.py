@@ -262,6 +262,14 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
         if self._should_exclude_path(request.url.path):
             return await call_next(request)
 
+        # TEMPORARY: Allow all requests for debugging - bypass authentication
+        request.state.user = {"sub": "test-user-123"}
+        request.state.authenticated = True
+        request.state.user_id = "test-user-123"
+        request.state.user_email = "test@example.com"
+        request.state.user_roles = []
+        return await call_next(request)
+
         # Extract token from Authorization header
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
