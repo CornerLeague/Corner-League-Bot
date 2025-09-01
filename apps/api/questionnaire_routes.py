@@ -571,7 +571,7 @@ async def save_team_preferences(
             update_user_query = text("""
                 UPDATE users
                 SET favorite_teams = :favorite_teams, updated_at = NOW()
-                WHERE id = :user_id
+                WHERE user_id = :user_id
             """)
             await db.execute(update_user_query, {
                 "user_id": user_id,
