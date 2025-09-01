@@ -46,7 +46,7 @@ class MockCredentials:
 
 
 def require_auth(
-    credentials: EnhancedCredentials = Depends(get_clerk_bearer())
+    credentials: EnhancedCredentials = Depends(get_clerk_bearer)
 ) -> EnhancedCredentials:
     """Dependency that requires valid authentication.
 
