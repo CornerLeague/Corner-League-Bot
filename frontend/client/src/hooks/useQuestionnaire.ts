@@ -209,13 +209,13 @@ export function useSaveSportPreferences() {
   return useMutation({
     mutationFn: async (data: SportPreferenceRequest[]) => {
       const token = await getToken();
-      const response = await fetch(`${API_BASE}/sports/preferences-v2`, {
+      const response = await fetch(`${API_BASE}/sports/preferences`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({ preferences: data })
       });
 
       if (!response.ok) {

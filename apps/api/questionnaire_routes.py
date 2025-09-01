@@ -1,4 +1,5 @@
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Body
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -12,10 +13,15 @@ from libs.api.mappers import (
 )
 from libs.api.response import ApiResponse
 from libs.auth.decorators import require_auth
-from libs.common.database import DatabaseManager
+from libs.common.database import DatabaseManager, get_database_manager
 from libs.common.questionnaire_models import Sport, Team, UserSportPreference, UserTeamPreference, FavoriteTeamsRequest, TeamPreferenceRequest
 
 router = APIRouter()
+
+# Dependency function for database manager
+async def get_db_manager() -> DatabaseManager:
+    """Get database manager instance for FastAPI dependency injection."""
+    return get_database_manager()
 
 # Response Models
 class SportResponse(BaseModel):
@@ -72,12 +78,7 @@ class SportPreferenceRequest(BaseModel):
 class SportRankingRequest(BaseModel):
     sport_rankings: list[str]
 
-async def get_db_manager() -> DatabaseManager:
-    """Get database manager dependency"""
-    from apps.api.main import db_manager
-    if db_manager is None:
-        raise HTTPException(status_code=500, detail="Database not initialized")
-    return db_manager
+# Removed duplicate get_db_manager - using the one from main.py
 
 @router.get("/status", response_model=ApiResponse[QuestionnaireStatusResponse])
 async def get_questionnaire_status(
@@ -167,81 +168,64 @@ async def get_available_sports(
         response_data = [map_sport_to_response(sport) for sport in sports]
         return ApiResponse(success=True, data=response_data)
 
+async def _get_teams_by_sport_internal(
+    sport_id: str,
+    db_manager: DatabaseManager
+) -> ApiResponse[list[TeamResponse]]:
+    """Internal helper function to get teams by sport ID."""
+    async with db_manager.session() as db:
+        # Verify sport exists and is active
+        sport_stmt = select(Sport).where(Sport.id == sport_id, Sport.is_active == True)
+        result = await db.execute(sport_stmt)
+        sport = result.scalar_one_or_none()
+
+        if not sport:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Sport with ID {sport_id} not found or inactive"
+            )
+
+        # Get teams for the sport with explicit join
+        teams_stmt = (
+            select(Team)
+            .join(Sport, Team.sport_id == Sport.id)
+            .where(
+                Team.sport_id == sport_id,
+                Team.is_active == True,
+                Sport.is_active == True
+            )
+            .order_by(Team.display_name)
+        )
+        result = await db.execute(teams_stmt)
+        teams = result.scalars().all()
+
+        response_data = [map_team_to_response(team) for team in teams]
+        return ApiResponse(success=True, data=response_data)
+
 @router.get("/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport(
     sport_id: str = Query(..., description="Sport ID to filter teams"),
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db_manager: DatabaseManager = Depends(get_db_manager)
 ):
-    """Get teams for a specific sport."""
-
-    async with db_manager.session() as db:
-        # Verify sport exists and is active
-        sport_stmt = select(Sport).where(Sport.id == sport_id, Sport.is_active == True)
-        result = await db.execute(sport_stmt)
-        sport = result.scalar_one_or_none()
-
-        if not sport:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sport with ID {sport_id} not found or inactive"
-            )
-
-        # Get teams for the sport with explicit join
-        teams_stmt = (
-            select(Team)
-            .join(Sport, Team.sport_id == Sport.id)
-            .where(
-                Team.sport_id == sport_id,
-                Team.is_active == True,
-                Sport.is_active == True
-            )
-            .order_by(Team.display_name)
-        )
-        result = await db.execute(teams_stmt)
-        teams = result.scalars().all()
-
-        response_data = [map_team_to_response(team) for team in teams]
-        return ApiResponse(success=True, data=response_data)
+    """Get teams by sport ID using query parameter."""
+    return await _get_teams_by_sport_internal(sport_id, db_manager)
 
 @router.get("/sports/{sport_id}/teams", response_model=ApiResponse[list[TeamResponse]])
 async def get_teams_by_sport_path(
     sport_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db_manager: DatabaseManager = Depends(get_db_manager)
 ):
-    """Get teams for a specific sport (path parameter version)."""
+    """Get teams by sport ID using path parameter."""
+    return await _get_teams_by_sport_internal(sport_id, db_manager)
 
-    async with db_manager.session() as db:
-        # Verify sport exists and is active
-        sport_stmt = select(Sport).where(Sport.id == sport_id, Sport.is_active == True)
-        result = await db.execute(sport_stmt)
-        sport = result.scalar_one_or_none()
+class SportPreferencesRequest(BaseModel):
+    preferences: list[SportPreferenceRequest]
 
-        if not sport:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sport with ID {sport_id} not found or inactive"
-            )
-
-        # Get teams for the sport with explicit join
-        teams_stmt = (
-            select(Team)
-            .join(Sport, Team.sport_id == Sport.id)
-            .where(
-                Team.sport_id == sport_id,
-                Team.is_active == True,
-                Sport.is_active == True
-            )
-            .order_by(Team.display_name)
-        )
-        result = await db.execute(teams_stmt)
-        teams = result.scalars().all()
-
-        response_data = [map_team_to_response(team) for team in teams]
-        return ApiResponse(success=True, data=response_data)
 
 @router.post(
-    "/sports/preferences-v2",
+    "/sports/preferences",
     response_model=ApiResponse[list[UserSportPreferenceResponse]],
 )
 async def save_sport_preferences(
@@ -250,40 +234,54 @@ async def save_sport_preferences(
     db_manager: DatabaseManager = Depends(get_db_manager)
 ):
     """Save user sport preferences."""
+    import json
 
     user_id = credentials.user_id
 
+    # Read and parse the raw request body
     try:
-        # Get and parse the request body
-        body = await request.body()
-        body_str = body.decode('utf-8')
-        print(f"DEBUG: Raw body: {body_str}")
-        print(f"DEBUG: Body type: {type(body_str)}")
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8')
+        request_body = json.loads(body_str)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON in request body: {str(e)}"
+        )
 
-        # Parse JSON
-        import json
-        try:
-            preferences_data = json.loads(body_str)
-            print(f"DEBUG: Parsed data: {preferences_data}")
-            print(f"DEBUG: Parsed data type: {type(preferences_data)}")
-        except json.JSONDecodeError as e:
-            print(f"DEBUG: JSON decode error: {e}")
-            raise HTTPException(status_code=400, detail="Invalid JSON format")
+    # Manually parse and validate the request body
+    if "preferences" not in request_body:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing 'preferences' field in request body"
+        )
 
-        # Validate and convert to SportPreferenceRequest objects
-        if not isinstance(preferences_data, list):
-            raise HTTPException(status_code=400, detail="Expected a list of preferences")
+    preferences_data = request_body["preferences"]
+    if not isinstance(preferences_data, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'preferences' must be a list"
+        )
 
-        preferences = []
-        for item in preferences_data:
-            try:
-                pref = SportPreferenceRequest(**item)
-                preferences.append(pref)
-            except Exception as e:
-                print(f"DEBUG: Validation error for item {item}: {e}")
-                raise HTTPException(status_code=400, detail=f"Invalid preference data: {e}")
+    # Convert to SportPreferenceRequest objects
+    preferences = []
+    for pref_data in preferences_data:
+        if not isinstance(pref_data, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each preference must be an object"
+            )
+        if "sport_id" not in pref_data or "interest_level" not in pref_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each preference must have 'sport_id' and 'interest_level' fields"
+            )
+        preferences.append(SportPreferenceRequest(
+            sport_id=pref_data["sport_id"],
+            interest_level=pref_data["interest_level"]
+        ))
 
-        print(f"DEBUG: Validated preferences: {preferences}")
+    try:
 
         # Validate interest levels
         for pref in preferences:
@@ -343,42 +341,18 @@ async def save_sport_preferences(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error saving sport preferences: {e}")
         raise HTTPException(
             status_code=500,
             detail="Failed to save sport preferences"
         )
 
+# Debug endpoint removed - use proper logging instead of debug prints
+
 @router.post(
-    "/sports/ranking/debug",
-    response_model=ApiResponse[dict],
+    "/sports/ranking",
+    response_model=ApiResponse[list[str]],
 )
-async def debug_sport_rankings(
-    raw_request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(require_auth)
-):
-    """Debug endpoint to see raw request data."""
-
-    # Get raw body
-    body = await raw_request.body()
-    content_type = raw_request.headers.get("content-type")
-
-    print(f"DEBUG RAW: Content-Type: {content_type}")
-    print(f"DEBUG RAW: Body type: {type(body)}")
-    print(f"DEBUG RAW: Body: {body}")
-    print(f"DEBUG RAW: Body decoded: {body.decode('utf-8') if body else 'Empty'}")
-
-    try:
-        import json
-        parsed = json.loads(body.decode('utf-8'))
-        print(f"DEBUG RAW: Parsed JSON: {parsed}")
-        print(f"DEBUG RAW: Parsed type: {type(parsed)}")
-    except Exception as e:
-        print(f"DEBUG RAW: JSON parse error: {e}")
-
-    return ApiResponse(success=True, data={"received": True})
-
-@router.post(
+@router.put(
     "/sports/ranking",
     response_model=ApiResponse[list[str]],
 )
@@ -387,49 +361,45 @@ async def save_sport_rankings(
     credentials: HTTPAuthorizationCredentials = Depends(require_auth),
     db_manager: DatabaseManager = Depends(get_db_manager)
 ):
-    """Save user sport rankings (preference order)."""
+    """Save user sport rankings (preference order). Supports both POST and PUT methods."""
+    import json
 
     user_id = credentials.user_id
 
+    # Read and parse the raw request body
     try:
-        # Get and parse the request body manually
-        body = await request.body()
-        body_str = body.decode('utf-8')
-        print(f"DEBUG: Raw body: {body_str}")
-        print(f"DEBUG: Body type: {type(body_str)}")
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8')
+        request_body = json.loads(body_str)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON in request body: {str(e)}"
+        )
 
-        # Parse JSON
-        import json
-        try:
-            ranking_data = json.loads(body_str)
-            print(f"DEBUG: Parsed data: {ranking_data}")
-            print(f"DEBUG: Parsed data type: {type(ranking_data)}")
-        except json.JSONDecodeError as e:
-            print(f"DEBUG: JSON decode error: {e}")
-            raise HTTPException(status_code=400, detail="Invalid JSON format")
+    # Validate the request body structure
+    if "sport_rankings" not in request_body:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing 'sport_rankings' field in request body"
+        )
 
-        # Validate and convert to SportRankingRequest object
-        try:
-            ranking_request = SportRankingRequest(**ranking_data)
-            print(f"DEBUG: Validated request: {ranking_request}")
-        except Exception as e:
-            print(f"DEBUG: Validation error: {e}")
-            raise HTTPException(status_code=400, detail=f"Invalid ranking data: {e}")
+    sport_rankings = request_body["sport_rankings"]
+    if not isinstance(sport_rankings, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'sport_rankings' must be a list of sport IDs"
+        )
 
-        sport_rankings = ranking_request.sport_rankings
-
+    try:
         async with db_manager.session() as db:
-            # Validate that all sport IDs are valid UUIDs and exist
-            sport_ids = sport_rankings
-
             # Verify all sports exist and are active
-            sports_stmt = select(Sport).where(Sport.id.in_(sport_ids), Sport.is_active == True)
+            sports_stmt = select(Sport).where(Sport.id.in_(sport_rankings), Sport.is_active == True)
             result = await db.execute(sports_stmt)
             existing_sports = result.scalars().all()
-            # Convert UUID objects to strings for comparison
             existing_sport_ids = {str(sport.id) for sport in existing_sports}
 
-            invalid_sport_ids = set(sport_ids) - existing_sport_ids
+            invalid_sport_ids = set(sport_rankings) - existing_sport_ids
             if invalid_sport_ids:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -437,8 +407,7 @@ async def save_sport_rankings(
                 )
 
             # Update the preference_order for existing sport preferences
-            for order, sport_id in enumerate(sport_ids, 1):
-                # Update existing preference with new order
+            for order, sport_id in enumerate(sport_rankings, 1):
                 update_stmt = (
                     select(UserSportPreference)
                     .where(
@@ -462,32 +431,15 @@ async def save_sport_rankings(
                     db.add(new_preference)
 
             await db.commit()
-
-            # Return the updated rankings
             return ApiResponse(success=True, data=sport_rankings)
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error saving sport rankings: {e}")
         raise HTTPException(
             status_code=500,
             detail="Failed to save sport rankings"
         )
-
-
-@router.put(
-    "/sports/ranking",
-    response_model=ApiResponse[list[str]],
-)
-async def update_sport_ranking(
-    request: SportRankingRequest,
-    credentials: HTTPAuthorizationCredentials = Depends(require_auth),
-    db_manager: DatabaseManager = Depends(get_db_manager),
-):
-    """Alias for ``save_sport_rankings`` using HTTP PUT."""
-
-    return await save_sport_rankings(request, credentials, db_manager)
 
 @router.post(
     "/teams/preferences",
@@ -499,37 +451,70 @@ async def save_team_preferences(
     db_manager: DatabaseManager = Depends(get_db_manager)
 ):
     """Save user team preferences."""
-
     user_id = credentials.user_id
 
-    # Debug: Check what we're actually receiving
-    body = await request.body()
-    print(f"DEBUG: Raw request body: {body}")
-    print(f"DEBUG: Body type: {type(body)}")
-
+    # Manually parse the JSON request body
     try:
-        import json
+        body = await request.body()
         body_str = body.decode('utf-8')
-        print(f"DEBUG: Body as string: {body_str}")
-        body_json = json.loads(body_str)
-        print(f"DEBUG: Parsed JSON: {body_json}")
-
-        # Manually create the FavoriteTeamsRequest
-        from libs.common.questionnaire_models import FavoriteTeamsRequest, TeamPreferenceRequest
-        team_selections = [TeamPreferenceRequest(**item) for item in body_json['team_selections']]
-        favorite_teams_request = FavoriteTeamsRequest(team_selections=team_selections)
-        preferences = favorite_teams_request.team_selections
-
+        request_data = json.loads(body_str)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON in request body"
+        )
     except Exception as e:
-        print(f"DEBUG: Error parsing body: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error reading request body: {str(e)}"
+        )
 
-    print(f"DEBUG: Team selections: {preferences}")
-    print(f"DEBUG: User ID: {user_id}")
+    # Validate the request structure
+    if not isinstance(request_data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Request body must be a JSON object"
+        )
 
-    # Debug each preference
-    for i, pref in enumerate(preferences):
-        print(f"DEBUG: Preference {i}: team_id={pref.team_id} (type: {type(pref.team_id)}), interest_level={pref.interest_level}")
+    if "team_selections" not in request_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing 'team_selections' field in request body"
+        )
+
+    team_selections = request_data["team_selections"]
+    if not isinstance(team_selections, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'team_selections' must be a list"
+        )
+
+    # Validate each team selection
+    preferences = []
+    for i, selection in enumerate(team_selections):
+        if not isinstance(selection, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Team selection at index {i} must be an object"
+            )
+
+        if "team_id" not in selection or "interest_level" not in selection:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Team selection at index {i} must have 'team_id' and 'interest_level' fields"
+            )
+
+        try:
+            team_pref = TeamPreferenceRequest(
+                team_id=selection["team_id"],
+                interest_level=selection["interest_level"]
+            )
+            preferences.append(team_pref)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid team selection at index {i}: {str(e)}"
+            )
 
     # Validate interest levels
     for pref in preferences:
@@ -599,7 +584,6 @@ async def save_team_preferences(
         except HTTPException:
             raise
         except Exception as e:
-            print(f"Error saving team preferences: {e}")
             raise HTTPException(
                 status_code=500,
                 detail="Failed to save team preferences"
