@@ -565,6 +565,19 @@ async def save_team_preferences(
                 db.add(new_pref)
                 new_preferences.append(new_pref)
 
+            # Update users.favorite_teams column to sync with the Manage Account view
+            favorite_team_ids = [str(pref.team_id) for pref in new_preferences]
+            from sqlalchemy import text
+            update_user_query = text("""
+                UPDATE users
+                SET favorite_teams = :favorite_teams, updated_at = NOW()
+                WHERE user_id = :user_id
+            """)
+            await db.execute(update_user_query, {
+                "user_id": user_id,
+                "favorite_teams": json.dumps(favorite_team_ids)
+            })
+
             await db.commit()
 
             # Create response data manually since relationships aren't loaded
