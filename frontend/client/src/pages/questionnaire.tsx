@@ -418,7 +418,7 @@ export default function QuestionnairePage() {
         <div className="text-center">
           <Users className="h-12 w-12 mx-auto mb-4 text-green-600" />
           <h2 className="text-2xl font-bold mb-2">Choose Your Teams</h2>
-          <p className="text-gray-600">Select your favorite teams from your chosen sports using the dropdown menus</p>
+          <p className="text-gray-600">Select multiple favorite teams from your chosen sports using the dropdown menus</p>
         </div>
 
         {teamsQuery.isLoading && (
@@ -445,47 +445,42 @@ export default function QuestionnairePage() {
         {Object.entries(teamsBySport).map(([sportId, sportTeams]) => {
           const typedSportTeams = sportTeams as Team[];
           const sport = sports.find(s => s.id === sportId);
-          const selectedTeamForSport = selectedTeams.find(t => t.sport_id === sportId);
+          const selectedTeamsForSport = selectedTeams.filter(t => t.sport_id === sportId);
 
           return (
             <div key={sportId} className="space-y-3">
               <h3 className="text-lg font-semibold text-gray-800">{sport?.name}</h3>
               <div className="max-w-md">
                 <Select
-                  value={selectedTeamForSport?.team_id || 'none'}
+                  value="none"
                   onValueChange={(value) => {
-                    // Remove existing selection for this sport first
-                    if (selectedTeamForSport) {
-                      toggleTeamSelection(selectedTeamForSport.team_id, sportId);
-                    }
-                    // Add new selection if not 'none'
                     if (value !== 'none') {
                       handleTeamSelect(value, sportId);
                     }
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder={`Select a ${sport?.name} team`} />
+                    <SelectValue placeholder={`Add ${sport?.name} teams`} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No team selected</SelectItem>
-                    {typedSportTeams.map((team: Team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name} ({team.city})
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="none">Select a team to add</SelectItem>
+                    {typedSportTeams
+                      .filter(team => !selectedTeamsForSport.some(st => st.team_id === team.id))
+                      .map((team: Team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name} ({team.city})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Show selected teams for this sport */}
-              {Array.isArray(selectedTeams) && selectedTeams.filter(t => t.sport_id === sportId).length > 0 && (
+              {selectedTeamsForSport.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-sm text-gray-600 mb-2">Selected teams:</p>
+                  <p className="text-sm text-gray-600 mb-2">Selected teams ({selectedTeamsForSport.length}):</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedTeams
-                      .filter(t => t.sport_id === sportId)
-                      .map(selectedTeam => {
+                    {selectedTeamsForSport.map(selectedTeam => {
                         const team = typedSportTeams.find((t: Team) => t.id === selectedTeam.team_id);
                         return (
                           <div key={selectedTeam.team_id} className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
@@ -501,6 +496,12 @@ export default function QuestionnairePage() {
                       })
                     }
                   </div>
+                </div>
+              )}
+
+              {selectedTeamsForSport.length === 0 && (
+                <div className="text-sm text-gray-500 italic">
+                  No teams selected for {sport?.name}
                 </div>
               )}
             </div>

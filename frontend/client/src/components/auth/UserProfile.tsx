@@ -23,6 +23,7 @@ import {
   Save,
   X
 } from 'lucide-react';
+import { FavoriteTeamSelector } from './FavoriteTeamSelector';
 
 interface UserPreferences {
   emailNotifications: boolean;
@@ -30,6 +31,7 @@ interface UserPreferences {
   sportsInterests: string[];
   preferredLanguage: string;
   timezone: string;
+  favorite_teams: string[];
 }
 
 export function UserProfile() {
@@ -41,7 +43,8 @@ export function UserProfile() {
     pushNotifications: false,
     sportsInterests: [],
     preferredLanguage: 'en',
-    timezone: 'UTC'
+    timezone: 'UTC',
+    favorite_teams: []
   });
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +57,7 @@ export function UserProfile() {
   const loadUserPreferences = async () => {
     try {
       const token = await getToken();
-      const response = await fetch('/api/user/preferences', {
+      const response = await fetch('/api/auth/preferences', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -62,7 +65,14 @@ export function UserProfile() {
 
       if (response.ok) {
         const data = await response.json();
-        setPreferences(data);
+        setPreferences({
+          emailNotifications: data.notification_email ?? true,
+          pushNotifications: data.notification_push ?? false,
+          sportsInterests: data.favorite_sports ?? [],
+          preferredLanguage: 'en',
+          timezone: 'UTC',
+          favorite_teams: data.favorite_teams ?? []
+        });
       }
     } catch (error) {
       console.error('Failed to load user preferences:', error);
@@ -73,13 +83,18 @@ export function UserProfile() {
     setLoading(true);
     try {
       const token = await getToken();
-      const response = await fetch('/api/user/preferences', {
+      const response = await fetch('/api/auth/preferences', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(preferences)
+        body: JSON.stringify({
+          favorite_teams: preferences.favorite_teams,
+          favorite_sports: preferences.sportsInterests,
+          notification_email: preferences.emailNotifications,
+          notification_push: preferences.pushNotifications
+        })
       });
 
       if (response.ok) {
@@ -267,6 +282,22 @@ export function UserProfile() {
               </div>
             </div>
           </div>
+
+          {/* Favorite Teams */}
+           <div>
+             <FavoriteTeamSelector
+                currentFavoriteTeams={preferences.favorite_teams}
+                onSave={async (teams: string[]) => {
+                  setPreferences(prev => ({
+                    ...prev,
+                    favorite_teams: teams
+                  }));
+                  await savePreferences();
+                }}
+                isEditing={isEditing}
+                onCancel={() => setIsEditing(false)}
+              />
+           </div>
         </div>
       </Card>
 

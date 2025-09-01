@@ -324,14 +324,38 @@ class UserService:
             bool: True if successful, False otherwise
         """
         try:
-            # Update in local database
-            # (Implementation depends on your database schema)
+            from libs.common.database import DatabaseManager
+            from sqlalchemy import text
+            import json
+
+            db_manager = DatabaseManager()
+
+            async with db_manager.session() as db:
+                # Update user preferences in the users table using user_id (Clerk ID)
+                query = text("""
+                    UPDATE users SET
+                        favorite_teams = :favorite_teams,
+                        favorite_sports = :favorite_sports,
+                        updated_at = NOW()
+                    WHERE user_id = :user_id
+                """)
+
+                await db.execute(query, {
+                    "user_id": user_id,
+                    "favorite_teams": json.dumps(preferences.favorite_teams),
+                    "favorite_sports": json.dumps(preferences.favorite_sports)
+                })
+
+                await db.commit()
 
             # Optionally sync with Clerk metadata
-            await self.clerk_client.update_user_metadata(
-                user_id,
-                public_metadata={"preferences": preferences.dict()}
-            )
+            try:
+                await self.clerk_client.update_user_metadata(
+                    user_id,
+                    public_metadata={"preferences": preferences.dict()}
+                )
+            except Exception as clerk_error:
+                logger.warning(f"Failed to sync with Clerk metadata: {clerk_error}")
 
             logger.info(f"Updated preferences for user: {user_id}")
             return True
@@ -350,11 +374,36 @@ class UserService:
             UserPreferences: The user's preferences
         """
         try:
-            # Get from local database first
-            # (Implementation depends on your database schema)
+            from libs.common.database import DatabaseManager
+            from sqlalchemy import text
 
-            # Fallback to default preferences
-            return UserPreferences()
+            db_manager = DatabaseManager()
+
+            async with db_manager.session() as db:
+                # Query user preferences from database using user_id (Clerk ID)
+                query = text("""
+                    SELECT
+                        favorite_teams,
+                        favorite_sports
+                    FROM users
+                    WHERE user_id = :user_id
+                """)
+
+                result = await db.execute(query, {"user_id": user_id})
+                row = result.fetchone()
+
+                if row:
+                    return UserPreferences(
+                        favorite_teams=row.favorite_teams or [],
+                        favorite_sports=row.favorite_sports or [],
+                        content_types=[],  # Not stored in current schema
+                        notification_email=True,  # Default values
+                        notification_push=False,
+                        notification_frequency="daily"
+                    )
+                else:
+                    # Return default preferences if no record found
+                    return UserPreferences()
 
         except Exception as e:
             logger.error(f"Failed to get user preferences: {e}")

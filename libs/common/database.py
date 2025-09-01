@@ -27,6 +27,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -110,7 +111,7 @@ class ContentItem(Base):
     image_url = Column(String(1000))
 
     # Sports-specific
-    sports_keywords = Column(JSON)  # ["basketball", "Lakers", "LeBron James"]
+    sports_keywords = Column(JSONB)  # ["basketball", "Lakers", "LeBron James"]
     entities = Column(JSON)  # {"teams": [...], "players": [...], "leagues": [...]}
     content_type = Column(String(50))  # game_recap, analysis, breaking_news, etc.
 
@@ -151,12 +152,12 @@ class ContentItem(Base):
         # SQLite-compatible indexes for search performance
         Index("idx_content_title", "title"),
         Index("idx_content_summary", "summary"),
-        Index("idx_content_sports_keywords", "sports_keywords"),
         Index("idx_content_content_type", "content_type"),
         Index("idx_content_active_quality", "is_active", "quality_score"),
         Index("idx_content_published_quality", "published_at", "quality_score"),
-        # Index("idx_content_search_vector", "search_vector", postgresql_using="gin"),  # PostgreSQL-specific
-        # Index("idx_content_sports_keywords", "sports_keywords", postgresql_using="gin"),  # PostgreSQL-specific
+        # PostgreSQL-specific indexes for JSON columns
+        # Index("idx_content_search_vector", "search_vector", postgresql_using="gin"),
+        Index("idx_content_sports_keywords", "sports_keywords", postgresql_using="gin")
     )
 
 
