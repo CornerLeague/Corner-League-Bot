@@ -1,5 +1,6 @@
 """Unit tests for questionnaire routes."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,11 +12,10 @@ from apps.api.questionnaire_routes import (
     get_teams_by_sport,
     get_user_preferences,
     save_team_preferences,
-    update_sport_ranking,
+    save_sport_rankings,
 )
 from libs.common.questionnaire_models import (
     Sport,
-    SportRankingRequest,
     Team,
     TeamPreferenceRequest,
     UserQuestionnaireStatus,
@@ -123,28 +123,34 @@ class TestQuestionnaireRoutes:
 
         assert exc_info.value.status_code == 404
 
-    async def test_update_sport_ranking_success(self, mock_db_manager):
-        """Test successful sport ranking update."""
+    async def test_save_sport_rankings_success(self, mock_db_manager, sample_sports):
+        """Test successful sport rankings save."""
         db_manager, mock_session = mock_db_manager
 
-        # Mock request and user
+        # Mock request with JSON body
         mock_request = MagicMock(spec=Request)
-        mock_request.state.user = {"sub": "user123"}
+        body_bytes = json.dumps({"sport_rankings": ["1", "2"]}).encode("utf-8")
+        mock_request.body = AsyncMock(return_value=body_bytes)
 
+        # Mock credentials
         mock_credentials = MagicMock(spec=HTTPAuthorizationCredentials)
-
-        request_data = SportRankingRequest(sport_rankings=["1", "2"])
+        mock_credentials.user_id = "user123"
 
         # Mock database operations
-        mock_session.execute.return_value = MagicMock()  # For delete operation
+        existing_result = MagicMock()
+        existing_result.scalars.return_value.all.return_value = sample_sports
+        preference_result = MagicMock()
+        preference_result.scalar_one_or_none.return_value = None
+        mock_session.execute.side_effect = [existing_result, preference_result, preference_result]
+        mock_session.add = MagicMock()
         mock_session.commit.return_value = None
 
         # Execute
-        with patch("apps.api.questionnaire_routes.get_current_user_id", return_value="user123"):
-            result = await update_sport_ranking(mock_request, request_data, db_manager, mock_credentials)
+        result = await save_sport_rankings(mock_request, mock_credentials, db_manager)
 
         # Assert
-        assert result["message"] == "Sport rankings updated successfully"
+        assert result.success is True
+        assert result.data == ["1", "2"]
         assert mock_session.commit.called
 
     async def test_save_team_preferences_success(self, mock_db_manager):
